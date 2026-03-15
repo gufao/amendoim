@@ -1,0 +1,177 @@
+@import "tailwindcss";
+
+@theme {
+  /* Base surfaces — warm earth dark */
+  --color-bg-primary: #12100e;
+  --color-bg-secondary: #1a1714;
+  --color-bg-tertiary: #211e1a;
+  --color-bg-elevated: #282420;
+  --color-bg-hover: #2e2a25;
+  --color-bg-active: #36312b;
+  --color-bg-surface: #1c1916;
+
+  /* Borders */
+  --color-border: #2e2924;
+  --color-border-subtle: #241f1b;
+  --color-border-focus: #c2956a;
+
+  /* Text */
+  --color-text-primary: #f5f0eb;
+  --color-text-secondary: #b0a698;
+  --color-text-muted: #6d6459;
+  --color-text-faint: #4a433b;
+
+  /* Accent — terracotta/copper */
+  --color-accent: #c2956a;
+  --color-accent-hover: #d4aa80;
+  --color-accent-muted: #a07a52;
+  --color-accent-subtle: rgba(194, 149, 106, 0.14);
+
+  /* Semantic */
+  --color-success: #7ec699;
+  --color-success-muted: rgba(126, 198, 153, 0.15);
+  --color-warning: #e0b44a;
+  --color-warning-muted: rgba(224, 180, 74, 0.15);
+  --color-error: #d98282;
+  --color-error-muted: rgba(217, 130, 130, 0.12);
+
+  /* Schema tree colors */
+  --color-schema-icon: #c2956a;
+  --color-table-icon: #8bb5cf;
+  --color-column-icon: #6d6459;
+  --color-pk-icon: #e0b44a;
+}
+
+@layer base {
+  *, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  html, body, #root {
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+  }
+
+  body {
+    background-color: var(--color-bg-primary);
+    color: var(--color-text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif;
+    font-size: 13px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Input autofill override */
+  input:-webkit-autofill {
+    -webkit-box-shadow: 0 0 0 30px var(--color-bg-tertiary) inset !important;
+    -webkit-text-fill-color: var(--color-text-primary) !important;
+  }
+
+  /* Selection */
+  ::selection {
+    background: rgba(194, 149, 106, 0.3);
+  }
+}
+
+/* Scrollbars — pseudo-elements, layer doesn't matter */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Animations — need to stay outside layers for @keyframes */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.2s ease-out;
+  }
+
+  .animate-slide-in {
+    animation: slideIn 0.15s ease-out;
+  }
+}
+
+@layer components {
+  .form-input {
+    width: 100%;
+    background: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 9px 12px;
+    font-size: 13px;
+    color: var(--color-text-primary);
+    transition: border-color 0.15s, box-shadow 0.15s;
+    outline: none;
+  }
+
+  .form-input::placeholder {
+    color: var(--color-text-faint);
+  }
+
+  .form-input:focus {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px var(--color-accent-subtle);
+  }
+
+  .filter-select,
+  .filter-input {
+    background: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 11px;
+    color: var(--color-text-primary);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .filter-select:focus,
+  .filter-input:focus {
+    border-color: var(--color-accent);
+  }
+
+  .filter-input::placeholder {
+    color: var(--color-text-faint);
+  }
+}
+
+/* Monaco editor — needs !important to override Monaco's inline styles */
+.monaco-editor,
+.monaco-editor .margin,
+.monaco-editor .monaco-editor-background,
+.monaco-editor .inputarea.ime-input {
+  background-color: var(--color-bg-secondary) !important;
+}
+
+.monaco-editor .scroll-decoration {
+  box-shadow: none !important;
+}
