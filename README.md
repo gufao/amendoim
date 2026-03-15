@@ -52,6 +52,16 @@ Baixe o `.dmg` mais recente na [página de releases](https://github.com/gufao/am
 
 > Requer macOS 11 (Big Sur) ou superior.
 
+### macOS: "app danificado" ou "não pode ser aberto"
+
+O app ainda não possui assinatura Apple Developer. Após instalar, execute no terminal:
+
+```bash
+xattr -cr /Applications/Amendoim.app
+```
+
+Ou: clique com o botão direito no app > **Abrir** > **Abrir** novamente no diálogo que aparecer.
+
 ## Desenvolvimento
 
 ```bash
