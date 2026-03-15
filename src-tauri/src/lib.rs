@@ -4,6 +4,7 @@ mod keychain;
 mod models;
 
 use db::connection::create_connection_manager;
+use tauri::menu::{AboutMetadataBuilder, MenuBuilder, SubmenuBuilder};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -11,6 +12,53 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(create_connection_manager())
+        .setup(|app| {
+            // Build About menu with icon and metadata
+            let about_metadata = AboutMetadataBuilder::new()
+                .name(Some("Amendoim"))
+                .version(Some(app.config().version.clone().unwrap_or("0.1.0".into())))
+                .copyright(Some("MIT License"))
+                .comments(Some("PostgreSQL database viewer for macOS"))
+                .build();
+
+            let app_menu = SubmenuBuilder::new(app, "Amendoim")
+                .about(Some(about_metadata))
+                .separator()
+                .hide()
+                .hide_others()
+                .show_all()
+                .separator()
+                .quit()
+                .build()?;
+
+            let edit_menu = SubmenuBuilder::new(app, "Edit")
+                .undo()
+                .redo()
+                .separator()
+                .cut()
+                .copy()
+                .paste()
+                .select_all()
+                .build()?;
+
+            let window_menu = SubmenuBuilder::new(app, "Window")
+                .minimize()
+                .maximize()
+                .close_window()
+                .separator()
+                .fullscreen()
+                .build()?;
+
+            let menu = MenuBuilder::new(app)
+                .item(&app_menu)
+                .item(&edit_menu)
+                .item(&window_menu)
+                .build()?;
+
+            app.set_menu(menu)?;
+
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             // Connection commands
             commands::connection::test_connection,
