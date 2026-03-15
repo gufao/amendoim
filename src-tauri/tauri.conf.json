@@ -27,12 +27,21 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["dmg", "app"],
+    "targets": ["dmg", "app", "updater"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns"
-    ]
+    ],
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEY2QzI4NzRBMUYxMTBDQgpSV1RMRVBHaGRDaHNENHlKaHc3SGpQWHJ6WmdBQlBWZnVYTFRnMEE4c05DSjc5dWl0VExLbEJ6Zwo=",
+      "endpoints": [
+        "https://github.com/gufao/amendoim/releases/latest/download/latest.json"
+      ]
+    }
   }
 }

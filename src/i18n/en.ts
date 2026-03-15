@@ -100,4 +100,9 @@ export const en: Record<TranslationKey, string> = {
   // Cell Viewer
   "cellViewer.column": "Column:",
   "cellViewer.copy": "Copy",
+
+  // Updates
+  "update.available": "Update available",
+  "update.install": "Install and restart",
+  "update.installing": "Installing...",
 };

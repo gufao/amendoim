@@ -98,6 +98,11 @@ export const ptBR = {
   // Cell Viewer
   "cellViewer.column": "Coluna:",
   "cellViewer.copy": "Copiar",
+
+  // Updates
+  "update.available": "Atualização disponível",
+  "update.install": "Instalar e reiniciar",
+  "update.installing": "Instalando...",
 } as const;
 
 export type TranslationKey = keyof typeof ptBR;

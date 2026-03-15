@@ -7,6 +7,7 @@ import { ResultsTable } from "./components/results/ResultsTable";
 import { useQueryStore } from "./stores/queryStore";
 import { useConnectionStore } from "./stores/connectionStore";
 import { ConnectionModal } from "./components/connection/ConnectionModal";
+import { UpdateChecker } from "./components/UpdateChecker";
 import { useT } from "./i18n";
 
 function App() {
@@ -118,6 +119,8 @@ function App() {
       {showConnectionModal && (
         <ConnectionModal onClose={() => setShowConnectionModal(false)} />
       )}
+
+      <UpdateChecker />
     </div>
   );
 }
