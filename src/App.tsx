@@ -9,6 +9,7 @@ import { useConnectionStore } from "./stores/connectionStore";
 import { ConnectionModal } from "./components/connection/ConnectionModal";
 import { UpdateChecker } from "./components/UpdateChecker";
 import { useT } from "./i18n";
+import { trackEvent } from "./lib/analytics";
 
 function App() {
   const addTab = useQueryStore((s) => s.addTab);
@@ -25,6 +26,7 @@ function App() {
 
   // Load saved connections and create initial tab on startup
   useEffect(() => {
+    trackEvent("app_opened");
     loadConnections();
     if (tabs.length === 0) {
       addTab();

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { QueryResult } from "../lib/tauri";
 import * as api from "../lib/tauri";
+import { trackEvent } from "../lib/analytics";
 
 export interface Filter {
   id: string;
@@ -152,12 +153,14 @@ export const useQueryStore = create<QueryState>((set, get) => ({
         tab.pageSize,
         tab.page * tab.pageSize
       );
+      trackEvent("query_executed", { row_count: result.row_count, time_ms: result.execution_time_ms });
       set((s) => ({
         tabs: s.tabs.map((t) =>
           t.id === id ? { ...t, result, isExecuting: false } : t
         ),
       }));
     } catch (e) {
+      trackEvent("query_error");
       set((s) => ({
         tabs: s.tabs.map((t) =>
           t.id === id

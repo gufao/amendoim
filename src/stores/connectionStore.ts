@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { ConnectionConfig } from "../lib/tauri";
 import * as api from "../lib/tauri";
+import { trackEvent } from "../lib/analytics";
 
 interface ConnectionState {
   connections: ConnectionConfig[];
@@ -75,6 +76,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
     try {
       await api.connect(id);
       set({ activeConnectionId: id });
+      trackEvent("connection_established");
     } catch (e) {
       const msg = String(e);
       set({ error: msg });
