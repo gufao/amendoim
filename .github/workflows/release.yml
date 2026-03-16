@@ -70,43 +70,31 @@ jobs:
             --password "$APPLE_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
             --no-wait || true
-          echo "Notarization submitted (non-blocking). Staple manually when Apple finishes processing."
+
+      - name: Build latest.json for updater
+        run: |
+          VERSION=$(grep '"version"' src-tauri/tauri.conf.json | head -1 | sed 's/.*: "\(.*\)".*/\1/')
+          UPDATE_TAR=$(ls src-tauri/target/release/bundle/macos/*.tar.gz 2>/dev/null || echo "")
+          SIG_FILE=$(ls src-tauri/target/release/bundle/macos/*.tar.gz.sig 2>/dev/null || echo "")
+          if [ -n "$UPDATE_TAR" ] && [ -n "$SIG_FILE" ]; then
+            SIG_CONTENT=$(cat "$SIG_FILE")
+            TAR_NAME=$(basename "$UPDATE_TAR")
+            printf '{"version":"%s","notes":"Amendoim v%s","pub_date":"%s","platforms":{"darwin-aarch64":{"signature":"%s","url":"https://github.com/gufao/amendoim/releases/download/v%s/%s"}}}' \
+              "$VERSION" "$VERSION" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$SIG_CONTENT" "$VERSION" "$TAR_NAME" > /tmp/latest.json
+          fi
 
       - name: Create GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION=$(grep '"version"' src-tauri/tauri.conf.json | head -1 | sed 's/.*: "\(.*\)".*/\1/')
-          DMG_PATH=$(ls src-tauri/target/release/bundle/dmg/*.dmg)
-
-          # Build latest.json for updater
-          UPDATE_TAR=$(ls src-tauri/target/release/bundle/macos/*.tar.gz 2>/dev/null || echo "")
-          SIG_FILE=$(ls src-tauri/target/release/bundle/macos/*.tar.gz.sig 2>/dev/null || echo "")
-
-          ASSETS="$DMG_PATH"
-          [ -n "$UPDATE_TAR" ] && ASSETS="$ASSETS $UPDATE_TAR"
-          [ -n "$SIG_FILE" ] && ASSETS="$ASSETS $SIG_FILE"
-
-          if [ -n "$UPDATE_TAR" ] && [ -n "$SIG_FILE" ]; then
-            SIG_CONTENT=$(cat "$SIG_FILE")
-            TAR_NAME=$(basename "$UPDATE_TAR")
-            cat > /tmp/latest.json << ENDJSON
-{
-  "version": "$VERSION",
-  "notes": "Amendoim v$VERSION",
-  "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-  "platforms": {
-    "darwin-aarch64": {
-      "signature": "$SIG_CONTENT",
-      "url": "https://github.com/gufao/amendoim/releases/download/v$VERSION/$TAR_NAME"
-    }
-  }
-}
-ENDJSON
-            ASSETS="$ASSETS /tmp/latest.json"
-          fi
-
+          DMG=$(ls src-tauri/target/release/bundle/dmg/*.dmg)
+          ARGS="$DMG"
+          for f in src-tauri/target/release/bundle/macos/*.tar.gz src-tauri/target/release/bundle/macos/*.tar.gz.sig; do
+            [ -f "$f" ] && ARGS="$ARGS $f"
+          done
+          [ -f /tmp/latest.json ] && ARGS="$ARGS /tmp/latest.json"
           gh release create "v$VERSION" \
             --title "Amendoim v$VERSION" \
-            --notes "Assinado com Developer ID Application (Threadcode LTDA). Na primeira abertura: clique direito > Abrir." \
-            $ASSETS
+            --notes "Assinado com Developer ID Application (Threadcode LTDA)." \
+            $ARGS
