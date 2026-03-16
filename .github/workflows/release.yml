@@ -49,19 +49,97 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
           security list-keychain -d user -s $KEYCHAIN_PATH
 
-      - name: Build, sign, and release
-        uses: tauri-apps/tauri-action@v0
+      - name: Build (without notarization)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
           APPLE_SIGNING_IDENTITY: "Developer ID Application: Threadcode LTDA (F8KSZ6C73Q)"
+        run: npm run tauri build
+
+      - name: Notarize with xcrun
+        env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        with:
-          tagName: v__VERSION__
-          releaseName: "Amendoim v__VERSION__"
-          releaseBody: "Veja os detalhes das mudanças nos commits."
-          releaseDraft: false
-          prerelease: false
+        run: |
+          APP_PATH="src-tauri/target/release/bundle/macos/Amendoim.app"
+          ZIP_PATH="src-tauri/target/release/bundle/macos/Amendoim.zip"
+
+          # Create zip for notarization
+          ditto -c -k --keepParent "$APP_PATH" "$ZIP_PATH"
+
+          # Submit and wait (10 min timeout)
+          xcrun notarytool submit "$ZIP_PATH" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait \
+            --timeout 600
+
+          # Staple the notarization ticket
+          xcrun stapler staple "$APP_PATH"
+
+      - name: Re-create DMG with notarized app
+        run: |
+          DMG_PATH="src-tauri/target/release/bundle/dmg"
+          APP_PATH="src-tauri/target/release/bundle/macos/Amendoim.app"
+          VERSION=$(grep '"version"' src-tauri/tauri.conf.json | head -1 | sed 's/.*: "\(.*\)".*/\1/')
+
+          # Remove old DMG
+          rm -f "$DMG_PATH"/*.dmg
+
+          # Create new DMG with notarized app
+          hdiutil create -volname "Amendoim" -srcfolder "$APP_PATH" -ov -format UDZO "$DMG_PATH/Amendoim_${VERSION}_aarch64.dmg"
+
+          # Notarize the DMG too
+          xcrun notarytool submit "$DMG_PATH/Amendoim_${VERSION}_aarch64.dmg" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait \
+            --timeout 600
+
+          xcrun stapler staple "$DMG_PATH/Amendoim_${VERSION}_aarch64.dmg"
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(grep '"version"' src-tauri/tauri.conf.json | head -1 | sed 's/.*: "\(.*\)".*/\1/')
+          DMG_PATH=$(ls src-tauri/target/release/bundle/dmg/*.dmg)
+          UPDATE_PATH=$(ls src-tauri/target/release/bundle/macos/*.tar.gz 2>/dev/null || echo "")
+          SIG_PATH=$(ls src-tauri/target/release/bundle/macos/*.tar.gz.sig 2>/dev/null || echo "")
+
+          ASSETS="$DMG_PATH"
+          [ -n "$UPDATE_PATH" ] && ASSETS="$ASSETS $UPDATE_PATH"
+          [ -n "$SIG_PATH" ] && ASSETS="$ASSETS $SIG_PATH"
+
+          # Create latest.json for updater
+          if [ -n "$UPDATE_PATH" ] && [ -n "$SIG_PATH" ]; then
+            SIG_CONTENT=$(cat "$SIG_PATH")
+            FILENAME=$(basename "$UPDATE_PATH")
+            cat > src-tauri/target/release/bundle/latest.json << ENDJSON
+          {
+            "version": "$VERSION",
+            "notes": "Amendoim v$VERSION",
+            "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "platforms": {
+              "darwin-aarch64": {
+                "signature": "$SIG_CONTENT",
+                "url": "https://github.com/gufao/amendoim/releases/download/v$VERSION/$FILENAME"
+              }
+            }
+          }
+          ENDJSON
+            ASSETS="$ASSETS src-tauri/target/release/bundle/latest.json"
+          fi
+
+          gh release create "v$VERSION" \
+            --title "Amendoim v$VERSION" \
+            --notes "Veja os detalhes das mudanças nos commits." \
+            $ASSETS
