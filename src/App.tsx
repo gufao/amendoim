@@ -1,4 +1,5 @@
 import { useEffect, useCallback, useState } from "react";
+import { AlertCircle, X } from "lucide-react";
 import { Sidebar } from "./components/layout/Sidebar";
 import { TopBar } from "./components/layout/TopBar";
 import { StatusBar } from "./components/layout/StatusBar";
@@ -8,6 +9,7 @@ import { useQueryStore } from "./stores/queryStore";
 import { useConnectionStore } from "./stores/connectionStore";
 import { ConnectionModal } from "./components/connection/ConnectionModal";
 import { UpdateChecker } from "./components/UpdateChecker";
+import type { ConnectionConfig } from "./lib/tauri";
 import { useT } from "./i18n";
 import { trackEvent } from "./lib/analytics";
 
@@ -19,10 +21,13 @@ function App() {
   const tabs = useQueryStore((s) => s.tabs);
   const activeConnectionId = useConnectionStore((s) => s.activeConnectionId);
   const loadConnections = useConnectionStore((s) => s.loadConnections);
+  const connectionError = useConnectionStore((s) => s.error);
+  const setConnectionError = useConnectionStore((s) => s.setError);
 
   const [editorHeight, setEditorHeight] = useState(280);
   const [isDragging, setIsDragging] = useState(false);
   const [showConnectionModal, setShowConnectionModal] = useState(false);
+  const [editingConnection, setEditingConnection] = useState<ConnectionConfig | null>(null);
 
   // Load saved connections and create initial tab on startup
   useEffect(() => {
@@ -81,7 +86,10 @@ function App() {
   return (
     <div className="h-full flex flex-col bg-bg-primary">
       <div className="flex-1 flex min-h-0">
-        <Sidebar onNewConnection={() => setShowConnectionModal(true)} />
+        <Sidebar
+          onNewConnection={() => setShowConnectionModal(true)}
+          onEditConnection={(config) => setEditingConnection(config)}
+        />
 
         <div className="flex-1 flex flex-col min-w-0">
           <TopBar />
@@ -122,7 +130,21 @@ function App() {
         <ConnectionModal onClose={() => setShowConnectionModal(false)} />
       )}
 
+      {editingConnection && (
+        <ConnectionModal
+          existing={editingConnection}
+          onClose={() => setEditingConnection(null)}
+        />
+      )}
+
       <UpdateChecker />
+
+      {connectionError && (
+        <ErrorToast
+          message={connectionError}
+          onDismiss={() => setConnectionError(null)}
+        />
+      )}
     </div>
   );
 }
@@ -158,6 +180,28 @@ function WelcomeScreen({ onConnect }: { onConnect: () => void }) {
         <p className="text-[11px] text-text-muted mt-4">
           {t("app.welcome.hint")}
         </p>
+      </div>
+    </div>
+  );
+}
+
+function ErrorToast({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  useEffect(() => {
+    const timer = setTimeout(onDismiss, 8000);
+    return () => clearTimeout(timer);
+  }, [message, onDismiss]);
+
+  return (
+    <div className="fixed bottom-12 right-4 z-50 max-w-sm animate-fade-in">
+      <div className="flex items-start gap-2.5 px-4 py-3 rounded-lg bg-bg-elevated border border-error/30 shadow-lg shadow-black/30">
+        <AlertCircle size={15} className="text-error shrink-0 mt-0.5" />
+        <p className="text-xs text-text-secondary leading-relaxed flex-1">{message}</p>
+        <button
+          onClick={onDismiss}
+          className="p-0.5 rounded hover:bg-bg-hover text-text-muted hover:text-text-primary transition-colors shrink-0"
+        >
+          <X size={13} />
+        </button>
       </div>
     </div>
   );

@@ -9,13 +9,15 @@ import {
 import { ConnectionList } from "../connection/ConnectionList";
 import { SchemaTree } from "../schema/SchemaTree";
 import { useConnectionStore } from "../../stores/connectionStore";
+import type { ConnectionConfig } from "../../lib/tauri";
 import { useT } from "../../i18n";
 
 interface Props {
   onNewConnection: () => void;
+  onEditConnection: (config: ConnectionConfig) => void;
 }
 
-export function Sidebar({ onNewConnection }: Props) {
+export function Sidebar({ onNewConnection, onEditConnection }: Props) {
   const t = useT();
   const [collapsed, setCollapsed] = useState(false);
   const activeConnectionId = useConnectionStore((s) => s.activeConnectionId);
@@ -84,7 +86,7 @@ export function Sidebar({ onNewConnection }: Props) {
               </span>
             )}
           </div>
-          <ConnectionList onNewConnection={onNewConnection} />
+          <ConnectionList onNewConnection={onNewConnection} onEditConnection={onEditConnection} />
         </div>
 
         {/* Schema section */}

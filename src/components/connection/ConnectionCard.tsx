@@ -1,4 +1,4 @@
-import { Database, Plug, Unplug, Trash2, Loader2 } from "lucide-react";
+import { Database, Plug, Unplug, Trash2, Loader2, Pencil } from "lucide-react";
 import type { ConnectionConfig } from "../../lib/tauri";
 import { useT } from "../../i18n";
 
@@ -9,6 +9,7 @@ interface Props {
   onConnect: () => void;
   onDisconnect: () => void;
   onDelete: () => void;
+  onEdit: () => void;
 }
 
 export function ConnectionCard({
@@ -18,6 +19,7 @@ export function ConnectionCard({
   onConnect,
   onDisconnect,
   onDelete,
+  onEdit,
 }: Props) {
   const t = useT();
   return (
@@ -83,6 +85,16 @@ export function ConnectionCard({
               )}
             </button>
           )}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit();
+            }}
+            className="p-1 rounded-md hover:bg-bg-active/50 text-text-muted hover:text-accent transition-colors"
+            title={t("connection.edit")}
+          >
+            <Pencil size={12} />
+          </button>
           <button
             onClick={(e) => {
               e.stopPropagation();

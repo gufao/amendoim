@@ -111,6 +111,9 @@ export function ConnectionModal({ onClose, existing }: Props) {
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               autoFocus
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
             />
           </FormField>
 
@@ -121,6 +124,9 @@ export function ConnectionModal({ onClose, existing }: Props) {
                 placeholder="localhost"
                 value={form.host}
                 onChange={(e) => setForm({ ...form, host: e.target.value })}
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
               />
             </FormField>
             <FormField label={t("connection.port")} className="w-24">
@@ -141,6 +147,9 @@ export function ConnectionModal({ onClose, existing }: Props) {
                 placeholder="postgres"
                 value={form.user}
                 onChange={(e) => setForm({ ...form, user: e.target.value })}
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
               />
             </FormField>
             <FormField icon={<Lock size={13} />} label={t("connection.password")} className="flex-1">
@@ -150,6 +159,9 @@ export function ConnectionModal({ onClose, existing }: Props) {
                 type="password"
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
               />
             </FormField>
           </div>
@@ -160,6 +172,9 @@ export function ConnectionModal({ onClose, existing }: Props) {
               placeholder="postgres"
               value={form.database}
               onChange={(e) => setForm({ ...form, database: e.target.value })}
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
             />
           </FormField>
 

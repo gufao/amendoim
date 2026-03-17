@@ -1,13 +1,15 @@
 import { useConnection } from "../../hooks/useConnection";
 import { ConnectionCard } from "./ConnectionCard";
+import type { ConnectionConfig } from "../../lib/tauri";
 import { Plus } from "lucide-react";
 import { useT } from "../../i18n";
 
 interface Props {
   onNewConnection: () => void;
+  onEditConnection: (config: ConnectionConfig) => void;
 }
 
-export function ConnectionList({ onNewConnection }: Props) {
+export function ConnectionList({ onNewConnection, onEditConnection }: Props) {
   const t = useT();
   const {
     connections,
@@ -43,6 +45,7 @@ export function ConnectionList({ onNewConnection }: Props) {
           onConnect={() => connectAndLoadSchema(conn.id)}
           onDisconnect={() => disconnectAndReset(conn.id)}
           onDelete={() => deleteConnection(conn.id)}
+          onEdit={() => onEditConnection(conn)}
         />
       ))}
     </div>

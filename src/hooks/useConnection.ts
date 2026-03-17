@@ -6,9 +6,13 @@ export function useConnection() {
   const schemaStore = useSchemaStore();
 
   const connectAndLoadSchema = async (id: string) => {
-    await store.connect(id);
-    schemaStore.reset();
-    await schemaStore.loadSchemas();
+    try {
+      await store.connect(id);
+      schemaStore.reset();
+      await schemaStore.loadSchemas();
+    } catch {
+      // error is already set in the store
+    }
   };
 
   const disconnectAndReset = async (id: string) => {
