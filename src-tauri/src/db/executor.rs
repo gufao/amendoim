@@ -132,6 +132,31 @@ fn pg_value_to_json(row: &sqlx::postgres::PgRow, ordinal: usize, type_name: &str
         "JSON" | "JSONB" => row
             .try_get::<serde_json::Value, _>(ordinal)
             .unwrap_or(serde_json::Value::Null),
+        "UUID" => row
+            .try_get::<uuid::Uuid, _>(ordinal)
+            .ok()
+            .map(|v| serde_json::Value::String(v.to_string()))
+            .unwrap_or(serde_json::Value::Null),
+        "TIMESTAMPTZ" => row
+            .try_get::<chrono::DateTime<chrono::Utc>, _>(ordinal)
+            .ok()
+            .map(|v| serde_json::Value::String(v.to_rfc3339()))
+            .unwrap_or(serde_json::Value::Null),
+        "TIMESTAMP" => row
+            .try_get::<chrono::NaiveDateTime, _>(ordinal)
+            .ok()
+            .map(|v| serde_json::Value::String(v.format("%Y-%m-%d %H:%M:%S").to_string()))
+            .unwrap_or(serde_json::Value::Null),
+        "DATE" => row
+            .try_get::<chrono::NaiveDate, _>(ordinal)
+            .ok()
+            .map(|v| serde_json::Value::String(v.to_string()))
+            .unwrap_or(serde_json::Value::Null),
+        "TIME" | "TIMETZ" => row
+            .try_get::<chrono::NaiveTime, _>(ordinal)
+            .ok()
+            .map(|v| serde_json::Value::String(v.to_string()))
+            .unwrap_or(serde_json::Value::Null),
         _ => row
             .try_get::<String, _>(ordinal)
             .ok()

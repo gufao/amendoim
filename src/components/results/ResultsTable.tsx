@@ -10,7 +10,7 @@ import {
 import { ArrowUpDown, ArrowUp, ArrowDown, TableProperties } from "lucide-react";
 import { useQuery } from "../../hooks/useQuery";
 import { useT } from "../../i18n";
-import { formatCellValue, isLongValue, truncate } from "../../lib/format";
+import { formatCellValue, truncate } from "../../lib/format";
 import { CellViewer } from "./CellViewer";
 import { FilterBar } from "./FilterBar";
 import { ResultsToolbar } from "./ResultsToolbar";
@@ -35,19 +35,16 @@ export function ResultsTable() {
         const value = info.getValue();
         const formatted = formatCellValue(value);
         const isNull = value === null || value === undefined;
-        const isLong = isLongValue(value);
 
         return (
           <span
             className={`block truncate ${
               isNull
                 ? "text-text-faint italic"
-                : isLong
-                ? "cursor-pointer hover:text-accent transition-colors"
-                : "text-text-secondary"
+                : "cursor-pointer hover:text-accent transition-colors text-text-secondary"
             }`}
             onClick={() => {
-              if (isLong) setViewingCell({ column: col.name, value });
+              if (!isNull) setViewingCell({ column: col.name, value });
             }}
           >
             {isNull ? t("results.null") : truncate(formatted, 80)}
