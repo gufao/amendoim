@@ -1,5 +1,5 @@
 import { X, Copy, Check } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { formatCellValue } from "../../lib/format";
 import { useT } from "../../i18n";
 
@@ -13,6 +13,13 @@ export function CellViewer({ column, value, onClose }: Props) {
   const t = useT();
   const [copied, setCopied] = useState(false);
   const formatted = formatCellValue(value);
+  const canCloseBackdrop = useRef(false);
+
+  // Guard against double-click: ignore backdrop clicks briefly after mount
+  useEffect(() => {
+    const id = setTimeout(() => { canCloseBackdrop.current = true; }, 300);
+    return () => clearTimeout(id);
+  }, []);
 
   // Close on Escape
   useEffect(() => {
@@ -47,7 +54,7 @@ export function CellViewer({ column, value, onClose }: Props) {
   return (
     <div
       className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
+      onClick={(e) => canCloseBackdrop.current && e.target === e.currentTarget && onClose()}
     >
       <div className="w-[600px] max-h-[70vh] bg-bg-elevated border border-border rounded-xl shadow-2xl shadow-black/40 flex flex-col animate-fade-in">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
