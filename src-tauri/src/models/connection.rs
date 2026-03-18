@@ -15,7 +15,11 @@ impl ConnectionConfig {
     pub fn connection_string(&self) -> String {
         format!(
             "postgres://{}:{}@{}:{}/{}",
-            self.user, self.password, self.host, self.port, self.database
+            urlencoding::encode(&self.user),
+            urlencoding::encode(&self.password),
+            urlencoding::encode(&self.host),
+            self.port,
+            urlencoding::encode(&self.database),
         )
     }
 }
