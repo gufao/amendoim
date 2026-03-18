@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { check } from "@tauri-apps/plugin-updater";
+import { useEffect, useRef, useState } from "react";
+import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { Download, X, RefreshCw } from "lucide-react";
 import { useT } from "../i18n";
@@ -12,6 +12,7 @@ export function UpdateChecker() {
   } | null>(null);
   const [installing, setInstalling] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  const updateRef = useRef<Update | null>(null);
 
   useEffect(() => {
     // Check for updates 3 seconds after startup
@@ -19,6 +20,7 @@ export function UpdateChecker() {
       try {
         const update = await check();
         if (update) {
+          updateRef.current = update;
           setUpdateAvailable({
             version: update.version,
             body: update.body || "",
@@ -37,7 +39,10 @@ export function UpdateChecker() {
   const handleInstall = async () => {
     setInstalling(true);
     try {
-      const update = await check();
+      let update = updateRef.current;
+      if (!update) {
+        update = await check();
+      }
       if (update) {
         await update.downloadAndInstall();
         await relaunch();
