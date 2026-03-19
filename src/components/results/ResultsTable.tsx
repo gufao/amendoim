@@ -129,8 +129,11 @@ export function ResultsTable() {
 
   if (result.rows.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-bg-primary">
-        <div className="text-xs text-text-faint">{t("results.noRows")}</div>
+      <div className="flex flex-col h-full bg-bg-primary">
+        <FilterBar />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-xs text-text-faint">{t("results.noRows")}</div>
+        </div>
       </div>
     );
   }
