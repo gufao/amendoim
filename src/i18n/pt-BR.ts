@@ -99,6 +99,14 @@ export const ptBR = {
   "cellViewer.column": "Coluna:",
   "cellViewer.copy": "Copiar",
 
+  // Editing
+  "edit.save": "Salvar",
+  "edit.saving": "Salvando...",
+  "edit.discard": "Descartar",
+  "edit.pendingChanges": "{count} alteracao(oes)",
+  "edit.noPrimaryKey": "Impossivel editar: tabela sem chave primaria",
+  "edit.saveError": "Erro ao salvar",
+
   // Updates
   "update.available": "Atualização disponível",
   "update.install": "Instalar e reiniciar",

@@ -36,6 +36,8 @@ export interface QueryTab {
   // Table preview context (for filters)
   tableContext: { schema: string; table: string } | null;
   filters: Filter[];
+  // Pending cell edits: rowIndex -> { column -> newValue }
+  pendingChanges: Record<number, Record<string, unknown>>;
 }
 
 interface QueryState {
@@ -55,6 +57,9 @@ interface QueryState {
   applyFilters: (tabId: string) => Promise<void>;
   setPage: (id: string, page: number) => void;
   setPageSize: (id: string, pageSize: number) => void;
+  updateCellValue: (tabId: string, rowIndex: number, column: string, value: unknown) => void;
+  savePendingChanges: (tabId: string) => Promise<void>;
+  discardPendingChanges: (tabId: string) => void;
 }
 
 let tabCounter = 1;
@@ -73,7 +78,16 @@ function createTab(title?: string, sql?: string): QueryTab {
     pageSize: 100,
     tableContext: null,
     filters: [],
+    pendingChanges: {},
   };
+}
+
+function toSqlLiteral(value: unknown): string {
+  if (value === null || value === undefined) return "NULL";
+  if (typeof value === "number") return String(value);
+  if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
+  const escaped = String(value).replace(/'/g, "''");
+  return `'${escaped}'`;
 }
 
 function buildFilteredSql(schema: string, table: string, filters: Filter[], limit: number): string {
@@ -328,5 +342,113 @@ export const useQueryStore = create<QueryState>((set, get) => ({
       ),
     }));
     get().executeQuery(id);
+  },
+
+  updateCellValue: (tabId, rowIndex, column, value) => {
+    const tab = get().tabs.find((t) => t.id === tabId);
+    if (!tab?.result) return;
+
+    const originalValue = tab.result.rows[rowIndex]?.[column];
+    const originalStr = originalValue === null || originalValue === undefined ? null : String(originalValue);
+    const newStr = value === null || value === undefined ? null : String(value);
+
+    if (originalStr === newStr) {
+      // Value matches original — remove from pending
+      const rowChanges = { ...tab.pendingChanges[rowIndex] };
+      delete rowChanges[column];
+      const newPending = { ...tab.pendingChanges };
+      if (Object.keys(rowChanges).length === 0) {
+        delete newPending[rowIndex];
+      } else {
+        newPending[rowIndex] = rowChanges;
+      }
+      set((s) => ({
+        tabs: s.tabs.map((t) =>
+          t.id === tabId ? { ...t, pendingChanges: newPending } : t
+        ),
+      }));
+    } else {
+      set((s) => ({
+        tabs: s.tabs.map((t) =>
+          t.id === tabId
+            ? {
+                ...t,
+                pendingChanges: {
+                  ...t.pendingChanges,
+                  [rowIndex]: {
+                    ...t.pendingChanges[rowIndex],
+                    [column]: value,
+                  },
+                },
+              }
+            : t
+        ),
+      }));
+    }
+  },
+
+  savePendingChanges: async (tabId) => {
+    const tab = get().tabs.find((t) => t.id === tabId);
+    if (!tab?.tableContext || !tab.result) return;
+
+    const { schema, table } = tab.tableContext;
+    const columns = await api.listColumns(schema, table);
+    const pkColumns = columns.filter((c) => c.is_primary_key).map((c) => c.name);
+
+    if (pkColumns.length === 0) {
+      throw new Error("NO_PRIMARY_KEY");
+    }
+
+    const errors: string[] = [];
+    let savedCount = 0;
+
+    for (const [rowIndexStr, changes] of Object.entries(tab.pendingChanges)) {
+      const rowIndex = parseInt(rowIndexStr);
+      const originalRow = tab.result.rows[rowIndex];
+      if (!originalRow) continue;
+
+      const setClauses = Object.entries(changes).map(
+        ([col, val]) => `"${col}" = ${toSqlLiteral(val)}`
+      );
+
+      const whereClauses = pkColumns.map((pk) => {
+        const val = originalRow[pk];
+        if (val === null || val === undefined) return `"${pk}" IS NULL`;
+        return `"${pk}" = ${toSqlLiteral(val)}`;
+      });
+
+      const sql = `UPDATE "${schema}"."${table}" SET ${setClauses.join(", ")} WHERE ${whereClauses.join(" AND ")}`;
+
+      try {
+        await api.executeQuery(sql);
+        savedCount++;
+      } catch (e) {
+        errors.push(`Row ${rowIndex + 1}: ${e}`);
+      }
+    }
+
+    // Clear pending changes
+    set((s) => ({
+      tabs: s.tabs.map((t) =>
+        t.id === tabId ? { ...t, pendingChanges: {} } : t
+      ),
+    }));
+
+    if (errors.length > 0) {
+      throw new Error(
+        `Saved ${savedCount}, failed ${errors.length}:\n${errors.join("\n")}`
+      );
+    }
+
+    // Refresh data
+    await get().executeQuery(tabId);
+  },
+
+  discardPendingChanges: (tabId) => {
+    set((s) => ({
+      tabs: s.tabs.map((t) =>
+        t.id === tabId ? { ...t, pendingChanges: {} } : t
+      ),
+    }));
   },
 }));

@@ -101,6 +101,14 @@ export const en: Record<TranslationKey, string> = {
   "cellViewer.column": "Column:",
   "cellViewer.copy": "Copy",
 
+  // Editing
+  "edit.save": "Save",
+  "edit.saving": "Saving...",
+  "edit.discard": "Discard",
+  "edit.pendingChanges": "{count} change(s)",
+  "edit.noPrimaryKey": "Cannot edit: table has no primary key",
+  "edit.saveError": "Save error",
+
   // Updates
   "update.available": "Update available",
   "update.install": "Install and restart",

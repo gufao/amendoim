@@ -4,20 +4,30 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  Save,
+  Undo2,
 } from "lucide-react";
 import { useQuery } from "../../hooks/useQuery";
 import { useT } from "../../i18n";
 import { exportCsv } from "../../lib/tauri";
 
 export function ResultsToolbar() {
-  const { activeTab, setPage, setPageSize } = useQuery();
+  const { activeTab, setPage, setPageSize, savePendingChanges, discardPendingChanges } =
+    useQuery();
   const t = useT();
   const [exporting, setExporting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   if (!activeTab?.result) return null;
 
   const { result, page, pageSize } = activeTab;
   const hasMore = result.row_count >= pageSize;
+
+  const pendingCount = Object.values(activeTab.pendingChanges || {}).reduce(
+    (sum, changes) => sum + Object.keys(changes).length,
+    0
+  );
 
   const handleExport = async () => {
     if (!activeTab.sql.trim()) return;
@@ -38,6 +48,28 @@ export function ResultsToolbar() {
     }
   };
 
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await savePendingChanges(activeTab.id);
+    } catch (e) {
+      const msg = String(e);
+      if (msg.includes("NO_PRIMARY_KEY")) {
+        setSaveError(t("edit.noPrimaryKey"));
+      } else {
+        setSaveError(msg);
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDiscard = () => {
+    setSaveError(null);
+    discardPendingChanges(activeTab.id);
+  };
+
   return (
     <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-bg-surface text-[11px] shrink-0">
       <div className="flex items-center gap-1">
@@ -53,6 +85,38 @@ export function ResultsToolbar() {
           )}
           {t("results.exportCsv")}
         </button>
+
+        {pendingCount > 0 && (
+          <div className="flex items-center gap-1 ml-2 pl-2 border-l border-border">
+            <span className="text-accent font-medium">
+              {t("edit.pendingChanges", { count: pendingCount })}
+            </span>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-accent text-bg-primary font-medium hover:bg-accent/90 transition-colors"
+            >
+              {saving ? (
+                <Loader2 size={11} className="animate-spin" />
+              ) : (
+                <Save size={11} />
+              )}
+              {saving ? t("edit.saving") : t("edit.save")}
+            </button>
+            <button
+              onClick={handleDiscard}
+              disabled={saving}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-md text-text-muted hover:bg-bg-hover hover:text-text-secondary transition-colors"
+            >
+              <Undo2 size={11} />
+              {t("edit.discard")}
+            </button>
+          </div>
+        )}
+
+        {saveError && (
+          <span className="ml-2 text-error text-[10px]">{saveError}</span>
+        )}
       </div>
 
       <div className="flex items-center gap-3">
