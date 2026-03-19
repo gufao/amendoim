@@ -1,4 +1,4 @@
-import { X, Copy, Check } from "lucide-react";
+import { X, Copy, Check, Pencil, Save } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { formatCellValue } from "../../lib/format";
 import { useT } from "../../i18n";
@@ -6,14 +6,19 @@ import { useT } from "../../i18n";
 interface Props {
   column: string;
   value: unknown;
+  editable?: boolean;
   onClose: () => void;
+  onSave?: (newValue: unknown) => void;
 }
 
-export function CellViewer({ column, value, onClose }: Props) {
+export function CellViewer({ column, value, editable, onClose, onSave }: Props) {
   const t = useT();
   const [copied, setCopied] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editValue, setEditValue] = useState("");
   const formatted = formatCellValue(value);
   const canCloseBackdrop = useRef(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Guard against double-click: ignore backdrop clicks briefly after mount
   useEffect(() => {
@@ -21,19 +26,41 @@ export function CellViewer({ column, value, onClose }: Props) {
     return () => clearTimeout(id);
   }, []);
 
-  // Close on Escape
+  // Close on Escape (only when not editing)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        if (editing) {
+          setEditing(false);
+        } else {
+          onClose();
+        }
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [onClose]);
+  }, [onClose, editing]);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(formatted);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleStartEdit = () => {
+    const raw = value === null || value === undefined
+      ? ""
+      : typeof value === "object"
+        ? JSON.stringify(value)
+        : String(value);
+    setEditValue(raw);
+    setEditing(true);
+    setTimeout(() => textareaRef.current?.focus(), 0);
+  };
+
+  const handleSave = () => {
+    const newValue = editValue === "" ? null : editValue;
+    onSave?.(newValue);
   };
 
   let displayValue = formatted;
@@ -68,6 +95,24 @@ export function CellViewer({ column, value, onClose }: Props) {
             )}
           </div>
           <div className="flex items-center gap-1">
+            {editable && !editing && (
+              <button
+                onClick={handleStartEdit}
+                className="p-1.5 rounded-lg hover:bg-bg-hover text-text-muted hover:text-text-primary transition-colors"
+                title={t("edit.save")}
+              >
+                <Pencil size={14} />
+              </button>
+            )}
+            {editing && (
+              <button
+                onClick={handleSave}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-accent text-bg-primary text-xs font-medium hover:bg-accent/90 transition-colors"
+              >
+                <Save size={12} />
+                {t("edit.save")}
+              </button>
+            )}
             <button
               onClick={handleCopy}
               className="p-1.5 rounded-lg hover:bg-bg-hover text-text-muted hover:text-text-primary transition-colors"
@@ -89,9 +134,25 @@ export function CellViewer({ column, value, onClose }: Props) {
         </div>
 
         <div className="flex-1 overflow-auto p-4">
-          <pre className="text-xs font-mono text-text-secondary whitespace-pre-wrap break-words leading-relaxed">
-            {displayValue}
-          </pre>
+          {editing ? (
+            <textarea
+              ref={textareaRef}
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault();
+                  handleSave();
+                }
+              }}
+              className="w-full h-full min-h-[120px] bg-bg-primary border border-border rounded-lg px-3 py-2 text-xs font-mono text-text-primary outline-none focus:border-accent resize-y"
+              placeholder="NULL"
+            />
+          ) : (
+            <pre className="text-xs font-mono text-text-secondary whitespace-pre-wrap break-words leading-relaxed">
+              {displayValue}
+            </pre>
+          )}
         </div>
       </div>
     </div>
