@@ -1,13 +1,19 @@
-import { Clock, Rows3, Zap, Globe } from "lucide-react";
+import { Clock, Rows3, Zap, Globe, Bot } from "lucide-react";
 import { useConnectionStore } from "../../stores/connectionStore";
+import { useMcpStore } from "../../stores/mcpStore";
 import { useQuery } from "../../hooks/useQuery";
 import { formatDuration, formatRowCount } from "../../lib/format";
 import { useT, useI18nStore, type Locale } from "../../i18n";
 
-export function StatusBar() {
+export function StatusBar({
+  onOpenMcp,
+}: {
+  onOpenMcp: () => void;
+}) {
   const t = useT();
   const { connections, activeConnectionId } = useConnectionStore();
   const { activeTab } = useQuery();
+  const mcpIsRunning = useMcpStore((s) => s.isRunning);
 
   const activeConn = connections.find((c) => c.id === activeConnectionId);
   const result = activeTab?.result;
@@ -69,6 +75,22 @@ export function StatusBar() {
           <span className="truncate max-w-xs">{activeTab.error}</span>
         </div>
       )}
+
+      {/* MCP toggle */}
+      <button
+        onClick={onOpenMcp}
+        className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors border ${
+          mcpIsRunning
+            ? "text-accent bg-accent-subtle border-accent/30"
+            : "text-text-faint hover:text-text-muted border-transparent hover:border-border"
+        }`}
+      >
+        <Bot size={10} />
+        {t("mcp.statusBar")}
+        {mcpIsRunning && (
+          <span className="w-1 h-1 rounded-full bg-success" />
+        )}
+      </button>
 
       {/* Language switcher */}
       <LanguageSwitcher />

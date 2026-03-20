@@ -113,4 +113,20 @@ export const en: Record<TranslationKey, string> = {
   "update.available": "Update available",
   "update.install": "Install and restart",
   "update.installing": "Installing...",
+
+  // MCP
+  "mcp.title": "AI Assistant (MCP)",
+  "mcp.subtitle": "Connect AI tools to your database",
+  "mcp.description": "Connect AI assistants to your database schema. The AI can read table structure but NOT your data. Generated queries appear in Amendoim for you to see.",
+  "mcp.serverRunning": "Server running",
+  "mcp.serverStopped": "Server stopped",
+  "mcp.start": "Start",
+  "mcp.stop": "Stop",
+  "mcp.setupTitle": "Set up in your AI client:",
+  "mcp.copy": "Copy",
+  "mcp.copied": "Copied!",
+  "mcp.install": "Add",
+  "mcp.privacyTitle": "Privacy:",
+  "mcp.privacyNote": "The AI only accesses metadata (table names, columns, types). Query results are displayed only in the Amendoim app — the AI never sees your data.",
+  "mcp.statusBar": "AI",
 };

@@ -100,3 +100,22 @@ export const previewTable = (schema: string, table: string) =>
 
 export const exportCsv = (sql: string) =>
   invoke<string>("export_csv", { sql });
+
+// MCP commands
+export interface McpStatus {
+  is_running: boolean;
+  port: number;
+  url: string;
+}
+
+export const startMcpServer = () =>
+  invoke<McpStatus>("start_mcp_server");
+
+export const stopMcpServer = () =>
+  invoke<void>("stop_mcp_server");
+
+export const getMcpStatus = () =>
+  invoke<McpStatus>("get_mcp_status");
+
+export const installMcpClient = (client: string) =>
+  invoke<string>("install_mcp_client", { client });

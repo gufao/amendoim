@@ -1,5 +1,6 @@
 import { useEffect, useCallback, useState } from "react";
 import { AlertCircle, X } from "lucide-react";
+import { listen } from "@tauri-apps/api/event";
 import { Sidebar } from "./components/layout/Sidebar";
 import { TopBar } from "./components/layout/TopBar";
 import { StatusBar } from "./components/layout/StatusBar";
@@ -8,6 +9,7 @@ import { ResultsTable } from "./components/results/ResultsTable";
 import { useQueryStore } from "./stores/queryStore";
 import { useConnectionStore } from "./stores/connectionStore";
 import { ConnectionModal } from "./components/connection/ConnectionModal";
+import { McpModal } from "./components/mcp/McpModal";
 import { UpdateChecker } from "./components/UpdateChecker";
 import type { ConnectionConfig } from "./lib/tauri";
 import { useT } from "./i18n";
@@ -27,6 +29,7 @@ function App() {
   const [editorHeight, setEditorHeight] = useState(280);
   const [isDragging, setIsDragging] = useState(false);
   const [showConnectionModal, setShowConnectionModal] = useState(false);
+  const [showMcpModal, setShowMcpModal] = useState(false);
   const [editingConnection, setEditingConnection] = useState<ConnectionConfig | null>(null);
 
   // Load saved connections and create initial tab on startup
@@ -37,6 +40,21 @@ function App() {
       addTab();
     }
   }, []);
+
+  // Listen for MCP execute-query events from AI assistants
+  useEffect(() => {
+    const unlisten = listen<{ sql: string; title: string }>(
+      "mcp-execute-query",
+      (event) => {
+        const { sql, title } = event.payload;
+        const tabId = addTab(title, sql);
+        executeQuery(tabId);
+      }
+    );
+    return () => {
+      unlisten.then((f) => f());
+    };
+  }, [addTab, executeQuery]);
 
   // Global keyboard shortcuts
   const handleKeyDown = useCallback(
@@ -124,7 +142,7 @@ function App() {
         </div>
       </div>
 
-      <StatusBar />
+      <StatusBar onOpenMcp={() => setShowMcpModal(true)} />
 
       {showConnectionModal && (
         <ConnectionModal onClose={() => setShowConnectionModal(false)} />
@@ -136,6 +154,8 @@ function App() {
           onClose={() => setEditingConnection(null)}
         />
       )}
+
+      {showMcpModal && <McpModal onClose={() => setShowMcpModal(false)} />}
 
       <UpdateChecker />
 

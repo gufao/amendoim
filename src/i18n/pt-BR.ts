@@ -111,6 +111,22 @@ export const ptBR = {
   "update.available": "Atualização disponível",
   "update.install": "Instalar e reiniciar",
   "update.installing": "Instalando...",
+
+  // MCP
+  "mcp.title": "Assistente IA (MCP)",
+  "mcp.subtitle": "Conecte ferramentas de IA ao seu banco",
+  "mcp.description": "Conecte assistentes de IA ao schema do seu banco de dados. A IA pode ler a estrutura das tabelas mas NÃO os seus dados. As consultas geradas aparecem no Amendoim para você visualizar.",
+  "mcp.serverRunning": "Servidor ativo",
+  "mcp.serverStopped": "Servidor parado",
+  "mcp.start": "Iniciar",
+  "mcp.stop": "Parar",
+  "mcp.setupTitle": "Configurar no seu cliente de IA:",
+  "mcp.copy": "Copiar",
+  "mcp.copied": "Copiado!",
+  "mcp.install": "Adicionar",
+  "mcp.privacyTitle": "Privacidade:",
+  "mcp.privacyNote": "A IA acessa apenas metadados (nomes de tabelas, colunas, tipos). Os dados das consultas são exibidos somente na tela do Amendoim — a IA nunca vê os resultados.",
+  "mcp.statusBar": "IA",
 } as const;
 
 export type TranslationKey = keyof typeof ptBR;

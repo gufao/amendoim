@@ -1,8 +1,10 @@
 mod commands;
 mod db;
 mod keychain;
+mod mcp;
 mod models;
 
+use commands::mcp::create_mcp_state;
 use db::connection::create_connection_manager;
 use tauri::menu::{AboutMetadataBuilder, MenuBuilder, SubmenuBuilder};
 
@@ -13,6 +15,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(create_connection_manager())
+        .manage(create_mcp_state())
         .setup(|app| {
             // Build About menu with icon and metadata
             let about_metadata = AboutMetadataBuilder::new()
@@ -79,6 +82,11 @@ pub fn run() {
             commands::query::execute_query,
             commands::query::preview_table,
             commands::query::export_csv,
+            // MCP commands
+            commands::mcp::start_mcp_server,
+            commands::mcp::stop_mcp_server,
+            commands::mcp::get_mcp_status,
+            commands::mcp::install_mcp_client,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
