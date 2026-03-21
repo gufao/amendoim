@@ -46,3 +46,6 @@ src-tauri/icons/ios/
 src-tauri/icons/Square*
 src-tauri/icons/StoreLogo.png
 src-tauri/icons/icon.ico
+
+# Test scripts
+test-mcp.sh
