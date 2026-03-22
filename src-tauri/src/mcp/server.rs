@@ -29,7 +29,7 @@ struct McpAppState {
 }
 
 pub async fn start_server(
-    port: u16,
+    listener: tokio::net::TcpListener,
     connection_manager: SharedConnectionManager,
     app_handle: tauri::AppHandle,
     shutdown_rx: tokio::sync::oneshot::Receiver<()>,
@@ -47,10 +47,6 @@ pub async fn start_server(
         .route("/sse", get(sse_handler))
         .route("/messages", post(message_handler))
         .with_state(state);
-
-    let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", port))
-        .await
-        .map_err(|e| format!("Failed to bind to port {}: {}", port, e))?;
 
     axum::serve(listener, app)
         .with_graceful_shutdown(async move {

@@ -13,7 +13,7 @@ const AI_CLIENTS = [
     name: "Claude Code",
     canAutoInstall: true,
     getCommand: (url: string) =>
-      `claude mcp add amendoim --transport sse ${url}`,
+      `claude mcp add --transport sse --scope user amendoim ${url}`,
   },
   {
     id: "claude-desktop",
@@ -29,22 +29,18 @@ const AI_CLIENTS = [
     },
   },
   {
+    id: "gemini",
+    name: "Gemini CLI",
+    canAutoInstall: true,
+    getCommand: (url: string) =>
+      `gemini mcp add --transport sse --scope user amendoim ${url}`,
+  },
+  {
     id: "codex",
     name: "Codex (OpenAI)",
     canAutoInstall: false,
     getCommand: (url: string) =>
       `codex --mcp-config '${JSON.stringify({ mcpServers: { amendoim: { type: "sse", url } } })}'`,
-  },
-  {
-    id: "gemini",
-    name: "Gemini CLI",
-    canAutoInstall: false,
-    getCommand: (url: string) =>
-      JSON.stringify(
-        { mcpServers: { amendoim: { url } } },
-        null,
-        2
-      ),
   },
 ] as const;
 

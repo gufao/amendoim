@@ -125,7 +125,7 @@ export const en: Record<TranslationKey, string> = {
   "mcp.setupTitle": "Set up in your AI client:",
   "mcp.copy": "Copy",
   "mcp.copied": "Copied!",
-  "mcp.install": "Add",
+  "mcp.install": "Install",
   "mcp.privacyTitle": "Privacy:",
   "mcp.privacyNote": "The AI only accesses metadata (table names, columns, types). Query results are displayed only in the Amendoim app — the AI never sees your data.",
   "mcp.statusBar": "AI",

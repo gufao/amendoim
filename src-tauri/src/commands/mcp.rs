@@ -29,6 +29,68 @@ rl.on("line", (line) => {
 "#;
 
 
+/// Resolve a CLI binary path. macOS GUI apps have a minimal PATH that doesn't
+/// include user-installed binaries, so we check known locations first, then
+/// fall back to the user's login shell for full PATH resolution.
+fn find_binary(name: &str) -> Result<String, String> {
+    // 1. Check tool-specific install locations
+    if let Some(home) = dirs::home_dir() {
+        if name == "claude" {
+            let path = home.join(".claude/bin/claude");
+            if path.exists() {
+                return Ok(path.to_string_lossy().to_string());
+            }
+        }
+    }
+
+    // 2. Check common system paths (Homebrew, manual installs)
+    for dir in ["/usr/local/bin", "/opt/homebrew/bin"] {
+        let path = format!("{}/{}", dir, name);
+        if std::path::Path::new(&path).exists() {
+            return Ok(path);
+        }
+    }
+
+    // 3. Try the user's login shell to resolve from their full PATH
+    //    Use -ilc: -i loads .zshrc/.bashrc (where most PATH configs live),
+    //    -l loads .zprofile/.bash_profile, ensuring we get the complete PATH.
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".into());
+    if let Ok(output) = std::process::Command::new(&shell)
+        .args(["-ilc", &format!("which {}", name)])
+        .output()
+    {
+        if output.status.success() {
+            let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !path.is_empty() {
+                return Ok(path);
+            }
+        }
+    }
+
+    Err(format!(
+        "Could not find '{}'. Please install it or run the command manually from your terminal.",
+        name
+    ))
+}
+
+/// Run `<bin> mcp add --transport sse --scope user amendoim <url>`.
+/// Works for both Claude Code and Gemini CLI since they share the same syntax.
+fn run_mcp_add(bin: &str, url: &str) -> Result<String, String> {
+    let output = std::process::Command::new(bin)
+        .args([
+            "mcp", "add", "--transport", "sse", "--scope", "user", "amendoim", url,
+        ])
+        .output()
+        .map_err(|e| format!("Failed to run '{}': {}", bin, e))?;
+
+    if output.status.success() {
+        Ok("Amendoim installed successfully!".into())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(format!("Failed: {}", stderr))
+    }
+}
+
 pub struct McpServerState {
     pub is_running: bool,
     pub port: u16,
@@ -68,12 +130,19 @@ pub async fn start_mcp_server(
     }
 
     let port = state.port;
+
+    // Bind the listener before spawning so port conflicts are caught immediately
+    let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", port))
+        .await
+        .map_err(|e| format!("Failed to bind to port {}: {}", port, e))?;
+
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
     let conn_manager = conn_state.inner().clone();
 
     let mcp_state_clone = mcp_state.inner().clone();
     tokio::spawn(async move {
-        let result = server::start_server(port, conn_manager, app_handle, shutdown_rx).await;
+        let result =
+            server::start_server(listener, conn_manager, app_handle, shutdown_rx).await;
         // When server stops, update state
         let mut s = mcp_state_clone.lock().await;
         s.is_running = false;
@@ -129,22 +198,12 @@ pub async fn install_mcp_client(
 
     match client.as_str() {
         "claude-code" => {
-            let output = std::process::Command::new("claude")
-                .args(["mcp", "add", "amendoim", "--transport", "sse", &url])
-                .output()
-                .map_err(|e| {
-                    format!(
-                        "Failed to run 'claude' command. Is Claude Code installed? Error: {}",
-                        e
-                    )
-                })?;
-
-            if output.status.success() {
-                Ok("Amendoim added to Claude Code successfully!".into())
-            } else {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                Err(format!("Failed: {}", stderr))
-            }
+            let bin = find_binary("claude")?;
+            run_mcp_add(&bin, &url)
+        }
+        "gemini" => {
+            let bin = find_binary("gemini")?;
+            run_mcp_add(&bin, &url)
         }
         "claude-desktop" => {
             let config_path = dirs::home_dir()

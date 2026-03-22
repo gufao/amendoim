@@ -123,7 +123,7 @@ export const ptBR = {
   "mcp.setupTitle": "Configurar no seu cliente de IA:",
   "mcp.copy": "Copiar",
   "mcp.copied": "Copiado!",
-  "mcp.install": "Adicionar",
+  "mcp.install": "Instalar",
   "mcp.privacyTitle": "Privacidade:",
   "mcp.privacyNote": "A IA acessa apenas metadados (nomes de tabelas, colunas, tipos). Os dados das consultas são exibidos somente na tela do Amendoim — a IA nunca vê os resultados.",
   "mcp.statusBar": "IA",
