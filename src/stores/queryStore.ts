@@ -178,7 +178,7 @@ export const useQueryStore = create<QueryState>((set, get) => ({
       set((s) => ({
         tabs: s.tabs.map((t) =>
           t.id === id
-            ? { ...t, error: String(e), isExecuting: false, result: null }
+            ? { ...t, error: String(e), isExecuting: false }
             : t
         ),
       }));
@@ -226,7 +226,7 @@ export const useQueryStore = create<QueryState>((set, get) => ({
       set((s) => ({
         tabs: s.tabs.map((t) =>
           t.id === tabId
-            ? { ...t, error: String(e), isExecuting: false, result: null }
+            ? { ...t, error: String(e), isExecuting: false }
             : t
         ),
       }));
@@ -321,7 +321,7 @@ export const useQueryStore = create<QueryState>((set, get) => ({
       set((s) => ({
         tabs: s.tabs.map((t) =>
           t.id === tabId
-            ? { ...t, error: String(e), isExecuting: false, result: null }
+            ? { ...t, error: String(e), isExecuting: false }
             : t
         ),
       }));

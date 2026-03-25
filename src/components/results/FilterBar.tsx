@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { Plus, X, Search } from "lucide-react";
 import { useQueryStore, FILTER_OPERATORS } from "../../stores/queryStore";
 import { useQuery } from "../../hooks/useQuery";
@@ -20,10 +21,16 @@ export function FilterBar() {
   const { activeTab } = useQuery();
   const { addFilter, updateFilter, removeFilter, applyFilters } = useQueryStore();
   const t = useT();
+  const columnsRef = useRef(activeTab?.result?.columns ?? []);
 
-  if (!activeTab?.tableContext || !activeTab.result?.columns.length) return null;
+  // Keep the last known columns so filters survive 0-row / error results
+  if (activeTab?.result?.columns?.length) {
+    columnsRef.current = activeTab.result.columns;
+  }
 
-  const columns = activeTab.result.columns;
+  const columns = columnsRef.current;
+
+  if (!activeTab?.tableContext || !columns.length) return null;
   const filters = activeTab.filters;
   const hasFilters = filters.length > 0;
 

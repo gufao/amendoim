@@ -2,6 +2,7 @@ use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::Mutex;
 
 use crate::models::connection::ConnectionConfig;
@@ -20,9 +21,17 @@ impl ConnectionManager {
     }
 
     pub async fn connect(&mut self, config: &ConnectionConfig) -> Result<(), String> {
+        let conn_str = format!(
+            "{}?keepalives=1&keepalives_idle=60",
+            config.connection_string()
+        );
+
         let pool = PgPoolOptions::new()
             .max_connections(5)
-            .connect(&config.connection_string())
+            .acquire_timeout(Duration::from_secs(10))
+            .idle_timeout(Duration::from_secs(600))
+            .test_before_acquire(true)
+            .connect(&conn_str)
             .await
             .map_err(|e| format!("Failed to connect: {}", e))?;
 

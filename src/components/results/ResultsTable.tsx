@@ -131,9 +131,20 @@ export function ResultsTable() {
     return (
       <div className="flex flex-col h-full bg-bg-primary">
         <FilterBar />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-xs text-text-faint">{t("results.noRows")}</div>
-        </div>
+        {activeTab.error ? (
+          <div className="px-4 pt-2">
+            <div className="rounded-lg border border-error/20 bg-error-muted p-3 animate-fade-in">
+              <div className="text-xs font-semibold text-error mb-1">{t("results.error")}</div>
+              <pre className="text-xs text-text-secondary whitespace-pre-wrap font-mono leading-relaxed">
+                {activeTab.error}
+              </pre>
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-xs text-text-faint">{t("results.noRows")}</div>
+          </div>
+        )}
       </div>
     );
   }
@@ -143,6 +154,16 @@ export function ResultsTable() {
       <FilterBar />
       <ResultsToolbar />
 
+      {activeTab.error ? (
+        <div className="flex-1 flex items-start p-4">
+          <div className="w-full rounded-lg border border-error/20 bg-error-muted p-3 animate-fade-in">
+            <div className="text-xs font-semibold text-error mb-1">{t("results.error")}</div>
+            <pre className="text-xs text-text-secondary whitespace-pre-wrap font-mono leading-relaxed">
+              {activeTab.error}
+            </pre>
+          </div>
+        </div>
+      ) : (
       <div className="flex-1 overflow-auto relative">
         {/* Loading overlay — keeps table visible underneath */}
         {activeTab.isExecuting && (
@@ -235,6 +256,7 @@ export function ResultsTable() {
           </tbody>
         </table>
       </div>
+      )}
 
       {viewingCell && (
         <CellViewer
