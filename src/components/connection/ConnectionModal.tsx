@@ -22,7 +22,8 @@ interface Props {
 
 export function ConnectionModal({ onClose, existing }: Props) {
   const t = useT();
-  const { saveConnection, testConnection } = useConnectionStore();
+  const saveConnection = useConnectionStore((s) => s.saveConnection);
+  const testConnection = useConnectionStore((s) => s.testConnection);
 
   const [form, setForm] = useState({
     name: existing?.name || "",

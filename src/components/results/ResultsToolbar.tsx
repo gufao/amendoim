@@ -7,13 +7,13 @@ import {
   Save,
   Undo2,
 } from "lucide-react";
-import { useQuery } from "../../hooks/useQuery";
+import { useToolbarQuery } from "../../hooks/useQuery";
 import { useT } from "../../i18n";
 import { exportCsv } from "../../lib/tauri";
 
 export function ResultsToolbar() {
   const { activeTab, setPage, setPageSize, savePendingChanges, discardPendingChanges } =
-    useQuery();
+    useToolbarQuery();
   const t = useT();
   const [exporting, setExporting] = useState(false);
   const [saving, setSaving] = useState(false);

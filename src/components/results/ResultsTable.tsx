@@ -8,7 +8,7 @@ import {
   type ColumnDef,
 } from "@tanstack/react-table";
 import { ArrowUpDown, ArrowUp, ArrowDown, TableProperties, Loader2 } from "lucide-react";
-import { useQuery } from "../../hooks/useQuery";
+import { useResultsQuery } from "../../hooks/useQuery";
 import { useT } from "../../i18n";
 import { formatCellValue, truncate } from "../../lib/format";
 import { CellViewer } from "./CellViewer";
@@ -16,7 +16,7 @@ import { FilterBar } from "./FilterBar";
 import { ResultsToolbar } from "./ResultsToolbar";
 
 export function ResultsTable() {
-  const { activeTab, updateCellValue } = useQuery();
+  const { activeTab, updateCellValue } = useResultsQuery();
   const t = useT();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [viewingCell, setViewingCell] = useState<{

@@ -1,10 +1,10 @@
 import Editor from "@monaco-editor/react";
-import { useQuery } from "../../hooks/useQuery";
+import { useEditorQuery } from "../../hooks/useQuery";
 import { useT } from "../../i18n";
 
 export function SqlEditor() {
   const t = useT();
-  const { activeTab, updateSql, executeActiveQuery } = useQuery();
+  const { activeTab, updateSql, executeActiveQuery } = useEditorQuery();
 
   if (!activeTab) {
     return (

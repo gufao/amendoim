@@ -1,7 +1,7 @@
 import { Clock, Rows3, Zap, Globe, Bot } from "lucide-react";
 import { useConnectionStore } from "../../stores/connectionStore";
 import { useMcpStore } from "../../stores/mcpStore";
-import { useQuery } from "../../hooks/useQuery";
+import { useStatusQuery } from "../../hooks/useQuery";
 import { formatDuration, formatRowCount } from "../../lib/format";
 import { useT, useI18nStore, type Locale } from "../../i18n";
 
@@ -11,8 +11,9 @@ export function StatusBar({
   onOpenMcp: () => void;
 }) {
   const t = useT();
-  const { connections, activeConnectionId } = useConnectionStore();
-  const { activeTab } = useQuery();
+  const connections = useConnectionStore((s) => s.connections);
+  const activeConnectionId = useConnectionStore((s) => s.activeConnectionId);
+  const { activeTab } = useStatusQuery();
   const mcpIsRunning = useMcpStore((s) => s.isRunning);
 
   const activeConn = connections.find((c) => c.id === activeConnectionId);

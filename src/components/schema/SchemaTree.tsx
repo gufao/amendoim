@@ -24,7 +24,7 @@ export function SchemaTree() {
     selectTable,
   } = useSchema();
 
-  const { previewTable } = useQueryStore();
+  const previewTable = useQueryStore((s) => s.previewTable);
   const t = useT();
 
   const handleTableClick = (schema: string, table: string) => {

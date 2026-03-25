@@ -1,11 +1,11 @@
 import { X, Plus, Play, Loader2, FileCode2 } from "lucide-react";
-import { useQuery } from "../../hooks/useQuery";
+import { useTabsQuery } from "../../hooks/useQuery";
 import { useT } from "../../i18n";
 
 export function TopBar() {
   const t = useT();
   const { tabs, activeTabId, setActiveTab, removeTab, addTab, executeActiveQuery, activeTab } =
-    useQuery();
+    useTabsQuery();
 
   return (
     <div className="h-10 bg-bg-secondary border-b border-border flex items-center shrink-0">

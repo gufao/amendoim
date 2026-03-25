@@ -46,18 +46,16 @@ const AI_CLIENTS = [
 
 export function McpModal({ onClose }: McpModalProps) {
   const t = useT();
-  const {
-    isRunning,
-    url,
-    isLoading,
-    error,
-    installMessage,
-    loadStatus,
-    startServer,
-    stopServer,
-    installClient,
-    clearMessages,
-  } = useMcpStore();
+  const isRunning = useMcpStore((s) => s.isRunning);
+  const url = useMcpStore((s) => s.url);
+  const isLoading = useMcpStore((s) => s.isLoading);
+  const error = useMcpStore((s) => s.error);
+  const installMessage = useMcpStore((s) => s.installMessage);
+  const loadStatus = useMcpStore((s) => s.loadStatus);
+  const startServer = useMcpStore((s) => s.startServer);
+  const stopServer = useMcpStore((s) => s.stopServer);
+  const installClient = useMcpStore((s) => s.installClient);
+  const clearMessages = useMcpStore((s) => s.clearMessages);
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
 

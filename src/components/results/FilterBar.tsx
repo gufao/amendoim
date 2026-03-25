@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import { Plus, X, Search } from "lucide-react";
 import { useQueryStore, FILTER_OPERATORS } from "../../stores/queryStore";
-import { useQuery } from "../../hooks/useQuery";
+import { useFilterQuery } from "../../hooks/useQuery";
 import { useT } from "../../i18n";
 
 const OPERATOR_LABEL_KEYS: Record<string, string> = {
@@ -18,8 +18,11 @@ const OPERATOR_LABEL_KEYS: Record<string, string> = {
 };
 
 export function FilterBar() {
-  const { activeTab } = useQuery();
-  const { addFilter, updateFilter, removeFilter, applyFilters } = useQueryStore();
+  const { activeTab } = useFilterQuery();
+  const addFilter = useQueryStore((s) => s.addFilter);
+  const updateFilter = useQueryStore((s) => s.updateFilter);
+  const removeFilter = useQueryStore((s) => s.removeFilter);
+  const applyFilters = useQueryStore((s) => s.applyFilters);
   const t = useT();
   const columnsRef = useRef(activeTab?.result?.columns ?? []);
 
