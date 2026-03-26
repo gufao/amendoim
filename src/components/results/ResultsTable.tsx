@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -7,6 +7,7 @@ import {
   type SortingState,
   type ColumnDef,
 } from "@tanstack/react-table";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowUpDown, ArrowUp, ArrowDown, TableProperties, Loader2 } from "lucide-react";
 import { useResultsQuery } from "../../hooks/useQuery";
 import { useT } from "../../i18n";
@@ -14,6 +15,8 @@ import { formatCellValue, truncate } from "../../lib/format";
 import { CellViewer } from "./CellViewer";
 import { FilterBar } from "./FilterBar";
 import { ResultsToolbar } from "./ResultsToolbar";
+
+const ROW_HEIGHT = 30;
 
 export function ResultsTable() {
   const { activeTab, updateCellValue } = useResultsQuery();
@@ -24,6 +27,7 @@ export function ResultsTable() {
     value: unknown;
     rowIndex: number;
   } | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const result = activeTab?.result;
   const isEditable = !!activeTab?.tableContext;
@@ -75,6 +79,17 @@ export function ResultsTable() {
     getSortedRowModel: getSortedRowModel(),
     columnResizeMode: "onChange",
   });
+
+  const rows = table.getRowModel().rows;
+
+  const virtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 10,
+  });
+
+  const virtualItems = virtualizer.getVirtualItems();
 
   if (!activeTab) return null;
 
@@ -164,7 +179,7 @@ export function ResultsTable() {
           </div>
         </div>
       ) : (
-      <div className="flex-1 overflow-auto relative">
+      <div ref={scrollRef} className="flex-1 overflow-auto relative">
         {/* Loading overlay — keeps table visible underneath */}
         {activeTab.isExecuting && (
           <div className="absolute inset-0 z-20 bg-bg-primary/60 flex items-center justify-center">
@@ -223,36 +238,55 @@ export function ResultsTable() {
             ))}
           </thead>
           <tbody>
-            {table.getRowModel().rows.map((row, i) => (
-              <tr
-                key={row.id}
-                className="border-b border-border-subtle hover:bg-bg-hover/50 transition-colors"
-              >
-                <td className="px-3 py-[6px] text-right text-text-faint text-[10px] bg-bg-surface border-r border-border-subtle">
-                  {(activeTab?.page || 0) * (activeTab?.pageSize || 100) + i + 1}
-                </td>
-                {row.getVisibleCells().map((cell) => {
-                  const rowIndex = row.index;
-                  const colName = cell.column.id;
-                  const hasPending = !!pendingChanges?.[rowIndex]?.[colName];
-
-                  return (
-                    <td
-                      key={cell.id}
-                      className={`px-3 py-[6px] border-r border-border-subtle/50 ${
-                        hasPending ? "bg-accent/10" : ""
-                      }`}
-                      style={{
-                        width: cell.column.getSize(),
-                        maxWidth: cell.column.getSize(),
-                      }}
-                    >
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </td>
-                  );
-                })}
+            {/* Top spacer to offset visible rows */}
+            {virtualItems.length > 0 && virtualItems[0].start > 0 && (
+              <tr>
+                <td style={{ height: virtualItems[0].start }} colSpan={columns.length + 1} />
               </tr>
-            ))}
+            )}
+            {virtualItems.map((virtualRow) => {
+              const row = rows[virtualRow.index];
+              const i = virtualRow.index;
+              return (
+                <tr
+                  key={row.id}
+                  className="border-b border-border-subtle hover:bg-bg-hover/50 transition-colors"
+                >
+                  <td className="px-3 py-[6px] text-right text-text-faint text-[10px] bg-bg-surface border-r border-border-subtle">
+                    {(activeTab?.page || 0) * (activeTab?.pageSize || 100) + i + 1}
+                  </td>
+                  {row.getVisibleCells().map((cell) => {
+                    const rowIndex = row.index;
+                    const colName = cell.column.id;
+                    const hasPending = !!pendingChanges?.[rowIndex]?.[colName];
+
+                    return (
+                      <td
+                        key={cell.id}
+                        className={`px-3 py-[6px] border-r border-border-subtle/50 ${
+                          hasPending ? "bg-accent/10" : ""
+                        }`}
+                        style={{
+                          width: cell.column.getSize(),
+                          maxWidth: cell.column.getSize(),
+                        }}
+                      >
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+            {/* Bottom spacer */}
+            {virtualItems.length > 0 && (
+              <tr>
+                <td
+                  style={{ height: virtualizer.getTotalSize() - virtualItems[virtualItems.length - 1].end }}
+                  colSpan={columns.length + 1}
+                />
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

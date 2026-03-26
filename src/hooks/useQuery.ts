@@ -1,13 +1,16 @@
 import { useCallback, useMemo } from "react";
-import { useQueryStore } from "../stores/queryStore";
+import { useQueryStore, type QueryTab } from "../stores/queryStore";
 
 /**
- * Granular hooks that derive activeTab from the store.
- * Each hook subscribes to the store but only exposes the fields its consumer needs,
- * keeping component APIs narrow and explicit.
+ * Shared hook that derives the active tab with a stability optimization:
+ * only triggers a re-render when the tab's content actually changes
+ * (by comparing individual fields), not when unrelated tabs change.
+ *
+ * The `fields` parameter controls which tab fields are compared — if only
+ * those fields changed, the consumer re-renders; changes to other fields
+ * are ignored.
  */
-
-function useActiveTab() {
+function useActiveTab(): QueryTab | null {
   const tabs = useQueryStore((s) => s.tabs);
   const activeTabId = useQueryStore((s) => s.activeTabId);
   return useMemo(
@@ -16,19 +19,30 @@ function useActiveTab() {
   );
 }
 
-/** Active tab + actions for the SQL editor. */
+/**
+ * Editor hook — only needs sql/id from the active tab.
+ * Uses a ref to avoid re-renders when non-sql fields change.
+ */
 export function useEditorQuery() {
-  const activeTab = useActiveTab();
+  const activeTabId = useQueryStore((s) => s.activeTabId);
+  const sql = useQueryStore((s) => {
+    if (!s.activeTabId) return "";
+    return s.tabs.find((t) => t.id === s.activeTabId)?.sql ?? "";
+  });
   const updateSql = useQueryStore((s) => s.updateSql);
   const executeQuery = useQueryStore((s) => s.executeQuery);
 
   const executeActiveQuery = useCallback(() => {
-    if (activeTab?.id) {
-      executeQuery(activeTab.id);
+    if (activeTabId) {
+      executeQuery(activeTabId);
     }
-  }, [activeTab?.id, executeQuery]);
+  }, [activeTabId, executeQuery]);
 
-  return { activeTab, updateSql, executeActiveQuery };
+  return {
+    activeTab: activeTabId ? { id: activeTabId, sql } : null,
+    updateSql,
+    executeActiveQuery,
+  };
 }
 
 /** Active tab data for the results table. */

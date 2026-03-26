@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Plus, X, Search } from "lucide-react";
 import { useQueryStore, FILTER_OPERATORS } from "../../stores/queryStore";
 import { useFilterQuery } from "../../hooks/useQuery";
@@ -16,6 +16,41 @@ const OPERATOR_LABEL_KEYS: Record<string, string> = {
   "IS NULL": "filter.op.isNull",
   "IS NOT NULL": "filter.op.isNotNull",
 };
+
+/** Local-state input that only syncs to the store on blur. */
+function FilterValueInput({
+  value,
+  onChange,
+  onApply,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onApply: () => void;
+  placeholder: string;
+}) {
+  const [local, setLocal] = useState(value);
+
+  // Sync from store when filter value changes externally
+  useEffect(() => { setLocal(value); }, [value]);
+
+  return (
+    <input
+      value={local}
+      onChange={(e) => setLocal(e.target.value)}
+      onBlur={() => onChange(local)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          onChange(local);
+          setTimeout(onApply, 0);
+        }
+      }}
+      placeholder={placeholder}
+      className="filter-input flex-1 min-w-[80px] max-w-[200px]"
+    />
+  );
+}
 
 export function FilterBar() {
   const { activeTab } = useFilterQuery();
@@ -39,13 +74,6 @@ export function FilterBar() {
 
   const handleApply = () => {
     applyFilters(activeTab.id);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      handleApply();
-    }
   };
 
   const needsValue = (op: string) => op !== "IS NULL" && op !== "IS NOT NULL";
@@ -92,22 +120,20 @@ export function FilterBar() {
 
           {/* Value */}
           {needsValue(filter.operator) && (
-            <input
+            <FilterValueInput
               value={filter.value}
-              onChange={(e) =>
-                updateFilter(activeTab.id, filter.id, { value: e.target.value })
-              }
-              onKeyDown={handleKeyDown}
+              onChange={(v) => updateFilter(activeTab.id, filter.id, { value: v })}
+              onApply={handleApply}
               placeholder={t("filter.value")}
-              className="filter-input flex-1 min-w-[80px] max-w-[200px]"
             />
           )}
 
           {/* Toggle */}
           <button
-            onClick={() =>
-              updateFilter(activeTab.id, filter.id, { enabled: !filter.enabled })
-            }
+            onClick={() => {
+              updateFilter(activeTab.id, filter.id, { enabled: !filter.enabled });
+              setTimeout(() => applyFilters(activeTab.id), 0);
+            }}
             className={`w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold transition-colors ${
               filter.enabled
                 ? "bg-accent-subtle text-accent"

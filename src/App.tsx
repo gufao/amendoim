@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from "react";
+import { useEffect, useCallback, useState, useRef } from "react";
 import { AlertCircle, X } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { Sidebar } from "./components/layout/Sidebar";
@@ -81,21 +81,29 @@ function App() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
 
-  // Resize splitter
+  // Resize splitter (throttled with rAF)
   const handleMouseDown = useCallback(() => setIsDragging(true), []);
+  const rafRef = useRef(0);
 
   useEffect(() => {
     if (!isDragging) return;
     const handleMouseMove = (e: MouseEvent) => {
-      const container = document.getElementById("editor-results");
-      if (!container) return;
-      const rect = container.getBoundingClientRect();
-      setEditorHeight(Math.max(80, Math.min(e.clientY - rect.top, rect.height - 80)));
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(() => {
+        const container = document.getElementById("editor-results");
+        if (!container) return;
+        const rect = container.getBoundingClientRect();
+        setEditorHeight(Math.max(80, Math.min(e.clientY - rect.top, rect.height - 80)));
+      });
     };
-    const handleMouseUp = () => setIsDragging(false);
+    const handleMouseUp = () => {
+      cancelAnimationFrame(rafRef.current);
+      setIsDragging(false);
+    };
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("mouseup", handleMouseUp);
     return () => {
+      cancelAnimationFrame(rafRef.current);
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
