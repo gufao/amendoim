@@ -14,10 +14,13 @@ pub async fn execute_query(
     limit: Option<i64>,
     offset: Option<i64>,
 ) -> Result<QueryResult, String> {
-    let manager = state.lock().await;
-    let connection_id = manager.active_id().ok_or("No active connection")?.to_string();
-    let pool = manager.get_active_pool()?;
-    executor::execute_query(pool, &sql, limit, offset, &pids, &connection_id).await
+    let (pool, connection_id) = {
+        let manager = state.lock().await;
+        let connection_id = manager.active_id().ok_or("No active connection")?.to_string();
+        let pool = manager.get_active_pool()?.clone();
+        (pool, connection_id)
+    };
+    executor::execute_query(&pool, &sql, limit, offset, &pids, &connection_id).await
 }
 
 #[tauri::command]
@@ -27,21 +30,24 @@ pub async fn preview_table(
     schema: String,
     table: String,
 ) -> Result<QueryResult, String> {
-    let manager = state.lock().await;
-    let connection_id = manager.active_id().ok_or("No active connection")?.to_string();
-    let pool = manager.get_active_pool()?;
+    let (pool, connection_id) = {
+        let manager = state.lock().await;
+        let connection_id = manager.active_id().ok_or("No active connection")?.to_string();
+        let pool = manager.get_active_pool()?.clone();
+        (pool, connection_id)
+    };
 
     // Get total count
     let count_sql = format!("SELECT count(*) as total FROM \"{}\".\"{}\"", schema, table);
     let count_row = sqlx::query(&count_sql)
-        .fetch_one(pool)
+        .fetch_one(&pool)
         .await
         .map_err(|e| format!("Count error: {}", e))?;
     let total: i64 = count_row.try_get("total").unwrap_or(0);
 
     // Get data
     let select_sql = format!("SELECT * FROM \"{}\".\"{}\" LIMIT 1000", schema, table);
-    let mut result = executor::execute_query(pool, &select_sql, None, None, &pids, &connection_id).await?;
+    let mut result = executor::execute_query(&pool, &select_sql, None, None, &pids, &connection_id).await?;
     result.total_rows = Some(total);
 
     Ok(result)
@@ -53,10 +59,13 @@ pub async fn export_csv(
     pids: State<'_, ActiveQueryPids>,
     sql: String,
 ) -> Result<String, String> {
-    let manager = state.lock().await;
-    let connection_id = manager.active_id().ok_or("No active connection")?.to_string();
-    let pool = manager.get_active_pool()?;
-    let result = executor::execute_query(pool, &sql, None, None, &pids, &connection_id).await?;
+    let (pool, connection_id) = {
+        let manager = state.lock().await;
+        let connection_id = manager.active_id().ok_or("No active connection")?.to_string();
+        let pool = manager.get_active_pool()?.clone();
+        (pool, connection_id)
+    };
+    let result = executor::execute_query(&pool, &sql, None, None, &pids, &connection_id).await?;
 
     if result.columns.is_empty() {
         return Ok(String::new());
@@ -97,8 +106,11 @@ pub async fn cancel_query(
     state: State<'_, SharedConnectionManager>,
     pids: State<'_, ActiveQueryPids>,
 ) -> Result<(), String> {
-    let manager = state.lock().await;
-    let connection_id = manager.active_id().ok_or("No active connection")?.to_string();
-    let pool = manager.get_active_pool()?;
-    executor::cancel_query(pool, &pids, &connection_id).await
+    let (pool, connection_id) = {
+        let manager = state.lock().await;
+        let connection_id = manager.active_id().ok_or("No active connection")?.to_string();
+        let pool = manager.get_active_pool()?.clone();
+        (pool, connection_id)
+    };
+    executor::cancel_query(&pool, &pids, &connection_id).await
 }
