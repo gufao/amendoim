@@ -101,6 +101,9 @@ export const previewTable = (schema: string, table: string) =>
 export const exportCsv = (sql: string) =>
   invoke<string>("export_csv", { sql });
 
+export const cancelQuery = () =>
+  invoke<void>("cancel_query");
+
 // MCP commands
 export interface McpStatus {
   is_running: boolean;

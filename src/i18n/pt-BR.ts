@@ -51,6 +51,8 @@ export const ptBR = {
   // Top Bar
   "topBar.newQuery": "Nova Query (Cmd+N)",
   "topBar.run": "Executar",
+  "topBar.stop": "Parar",
+  "topBar.cancelQuery": "Cancelar Query (Cmd+Enter)",
   "topBar.executeQuery": "Executar Query (Cmd+Enter)",
 
   // Editor

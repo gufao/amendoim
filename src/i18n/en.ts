@@ -53,6 +53,8 @@ export const en: Record<TranslationKey, string> = {
   // Top Bar
   "topBar.newQuery": "New Query (Cmd+N)",
   "topBar.run": "Run",
+  "topBar.stop": "Stop",
+  "topBar.cancelQuery": "Cancel Query (Cmd+Enter)",
   "topBar.executeQuery": "Execute Query (Cmd+Enter)",
 
   // Editor

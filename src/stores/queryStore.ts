@@ -50,6 +50,7 @@ interface QueryState {
   updateSql: (id: string, sql: string) => void;
   updateTitle: (id: string, title: string) => void;
   executeQuery: (id: string) => Promise<void>;
+  cancelQuery: (id: string) => Promise<void>;
   previewTable: (schema: string, table: string) => Promise<void>;
   addFilter: (id: string) => void;
   updateFilter: (tabId: string, filterId: string, updates: Partial<Filter>) => void;
@@ -174,14 +175,34 @@ export const useQueryStore = create<QueryState>((set, get) => ({
         ),
       }));
     } catch (e) {
-      trackEvent("query_error");
+      const errorStr = String(e);
+      const isCancelled = errorStr.includes("57014") || errorStr.toLowerCase().includes("cancel");
+      if (!isCancelled) {
+        trackEvent("query_error");
+      }
       set((s) => ({
         tabs: s.tabs.map((t) =>
           t.id === id
-            ? { ...t, error: String(e), isExecuting: false }
+            ? {
+                ...t,
+                error: isCancelled ? null : errorStr,
+                isExecuting: false,
+              }
             : t
         ),
       }));
+    }
+  },
+
+  cancelQuery: async (id) => {
+    const tab = get().tabs.find((t) => t.id === id);
+    if (!tab || !tab.isExecuting) return;
+
+    try {
+      await api.cancelQuery();
+    } catch (e) {
+      // If cancel itself fails, still let the original query finish naturally
+      console.warn("Cancel failed:", e);
     }
   },
 
