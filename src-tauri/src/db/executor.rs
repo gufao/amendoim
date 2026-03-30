@@ -23,15 +23,23 @@ pub async fn execute_query(
 ) -> Result<QueryResult, String> {
     let start = Instant::now();
 
+    // Acquire a dedicated connection so that the PID we track matches the
+    // connection that actually executes the query (pool.fetch_one and
+    // pool.fetch_all could hand out different connections).
+    let mut conn = pool
+        .acquire()
+        .await
+        .map_err(|e| format!("Failed to acquire connection: {}", e))?;
+
     // Get and store the backend PID for cancellation support
     let pid: i32 = sqlx::query_scalar("SELECT pg_backend_pid()")
-        .fetch_one(pool)
+        .fetch_one(&mut *conn)
         .await
         .map_err(|e| format!("Failed to get backend PID: {}", e))?;
 
     active_pids.lock().await.insert(connection_id.to_string(), pid);
 
-    let result = execute_query_inner(pool, sql, limit, offset, start).await;
+    let result = execute_query_inner(&mut *conn, sql, limit, offset, start).await;
 
     // Always clean up PID, even on error
     active_pids.lock().await.remove(connection_id);
@@ -40,7 +48,7 @@ pub async fn execute_query(
 }
 
 async fn execute_query_inner(
-    pool: &PgPool,
+    conn: &mut sqlx::PgConnection,
     sql: &str,
     limit: Option<i64>,
     offset: Option<i64>,
@@ -70,7 +78,7 @@ async fn execute_query_inner(
 
     if is_select {
         let rows = sqlx::query(&final_sql)
-            .fetch_all(pool)
+            .fetch_all(&mut *conn)
             .await
             .map_err(|e| format!("Query error: {}", e))?;
 
@@ -112,7 +120,7 @@ async fn execute_query_inner(
         })
     } else {
         let result = sqlx::query(&final_sql)
-            .execute(pool)
+            .execute(&mut *conn)
             .await
             .map_err(|e| format!("Query error: {}", e))?;
 
