@@ -25,23 +25,31 @@ function useActiveTab(): QueryTab | null {
  */
 export function useEditorQuery() {
   const activeTabId = useQueryStore((s) => s.activeTabId);
+  const isExecuting = useQueryStore((s) => {
+    if (!s.activeTabId) return false;
+    return s.tabs.find((t) => t.id === s.activeTabId)?.isExecuting ?? false;
+  });
   const sql = useQueryStore((s) => {
     if (!s.activeTabId) return "";
     return s.tabs.find((t) => t.id === s.activeTabId)?.sql ?? "";
   });
   const updateSql = useQueryStore((s) => s.updateSql);
   const executeQuery = useQueryStore((s) => s.executeQuery);
+  const cancelQuery = useQueryStore((s) => s.cancelQuery);
 
-  const executeActiveQuery = useCallback(() => {
-    if (activeTabId) {
+  const toggleActiveQuery = useCallback(() => {
+    if (!activeTabId) return;
+    if (isExecuting) {
+      cancelQuery(activeTabId);
+    } else {
       executeQuery(activeTabId);
     }
-  }, [activeTabId, executeQuery]);
+  }, [activeTabId, isExecuting, executeQuery, cancelQuery]);
 
   return {
     activeTab: activeTabId ? { id: activeTabId, sql } : null,
     updateSql,
-    executeActiveQuery,
+    executeActiveQuery: toggleActiveQuery,
   };
 }
 
@@ -77,6 +85,7 @@ export function useTabsQuery() {
   const removeTab = useQueryStore((s) => s.removeTab);
   const addTab = useQueryStore((s) => s.addTab);
   const executeQuery = useQueryStore((s) => s.executeQuery);
+  const cancelQuery = useQueryStore((s) => s.cancelQuery);
 
   const executeActiveQuery = useCallback(() => {
     if (activeTab?.id) {
@@ -84,7 +93,13 @@ export function useTabsQuery() {
     }
   }, [activeTab?.id, executeQuery]);
 
-  return { tabs, activeTabId, activeTab, setActiveTab, removeTab, addTab, executeActiveQuery };
+  const cancelActiveQuery = useCallback(() => {
+    if (activeTab?.id) {
+      cancelQuery(activeTab.id);
+    }
+  }, [activeTab?.id, cancelQuery]);
+
+  return { tabs, activeTabId, activeTab, setActiveTab, removeTab, addTab, executeActiveQuery, cancelActiveQuery };
 }
 
 /** Minimal active tab info for the status bar. */

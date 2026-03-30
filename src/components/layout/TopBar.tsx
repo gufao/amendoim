@@ -1,11 +1,13 @@
-import { X, Plus, Play, Loader2, FileCode2 } from "lucide-react";
+import { X, Plus, Play, Square, Loader2, FileCode2 } from "lucide-react";
 import { useTabsQuery } from "../../hooks/useQuery";
 import { useT } from "../../i18n";
 
 export function TopBar() {
   const t = useT();
-  const { tabs, activeTabId, setActiveTab, removeTab, addTab, executeActiveQuery, activeTab } =
+  const { tabs, activeTabId, setActiveTab, removeTab, addTab, executeActiveQuery, cancelActiveQuery, activeTab } =
     useTabsQuery();
+
+  const isExecuting = activeTab?.isExecuting ?? false;
 
   return (
     <div className="h-10 bg-bg-secondary border-b border-border flex items-center shrink-0">
@@ -54,24 +56,31 @@ export function TopBar() {
         </button>
       </div>
 
-      {/* Run button */}
+      {/* Run / Stop button */}
       <div className="flex items-center px-3 gap-2 shrink-0">
         <div className="text-[10px] text-text-faint hidden sm:block">
           {"\u2318"}Enter
         </div>
-        <button
-          onClick={executeActiveQuery}
-          disabled={!activeTab || activeTab.isExecuting || !activeTab.sql.trim()}
-          className="flex items-center gap-1.5 pl-3 pr-3.5 py-1.5 rounded-lg text-xs font-medium bg-accent hover:bg-accent-hover text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-[0.97] shadow-sm shadow-accent/20"
-          title={t("topBar.executeQuery")}
-        >
-          {activeTab?.isExecuting ? (
-            <Loader2 size={13} className="animate-spin" />
-          ) : (
+        {isExecuting ? (
+          <button
+            onClick={cancelActiveQuery}
+            className="flex items-center gap-1.5 pl-3 pr-3.5 py-1.5 rounded-lg text-xs font-medium bg-error hover:bg-error/80 text-white transition-all active:scale-[0.97] shadow-sm"
+            title={t("topBar.cancelQuery")}
+          >
+            <Square size={13} fill="currentColor" />
+            <span>{t("topBar.stop")}</span>
+          </button>
+        ) : (
+          <button
+            onClick={executeActiveQuery}
+            disabled={!activeTab || !activeTab.sql.trim()}
+            className="flex items-center gap-1.5 pl-3 pr-3.5 py-1.5 rounded-lg text-xs font-medium bg-accent hover:bg-accent-hover text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-[0.97] shadow-sm shadow-accent/20"
+            title={t("topBar.executeQuery")}
+          >
             <Play size={13} fill="currentColor" />
-          )}
-          <span>{t("topBar.run")}</span>
-        </button>
+            <span>{t("topBar.run")}</span>
+          </button>
+        )}
       </div>
     </div>
   );
