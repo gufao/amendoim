@@ -6,6 +6,7 @@ mod models;
 
 use commands::mcp::create_mcp_state;
 use db::connection::create_connection_manager;
+use db::executor::create_active_query_pids;
 use tauri::menu::{AboutMetadataBuilder, MenuBuilder, SubmenuBuilder};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -15,6 +16,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(create_connection_manager())
+        .manage(create_active_query_pids())
         .manage(create_mcp_state())
         .setup(|app| {
             // Build About menu with icon and metadata
@@ -82,6 +84,7 @@ pub fn run() {
             commands::query::execute_query,
             commands::query::preview_table,
             commands::query::export_csv,
+            commands::query::cancel_query,
             // MCP commands
             commands::mcp::start_mcp_server,
             commands::mcp::stop_mcp_server,

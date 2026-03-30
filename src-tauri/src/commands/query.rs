@@ -3,27 +3,32 @@ use tauri::State;
 
 use crate::db::connection::SharedConnectionManager;
 use crate::db::executor;
+use crate::db::executor::ActiveQueryPids;
 use crate::models::result::QueryResult;
 
 #[tauri::command]
 pub async fn execute_query(
     state: State<'_, SharedConnectionManager>,
+    pids: State<'_, ActiveQueryPids>,
     sql: String,
     limit: Option<i64>,
     offset: Option<i64>,
 ) -> Result<QueryResult, String> {
     let manager = state.lock().await;
+    let connection_id = manager.active_id().ok_or("No active connection")?.to_string();
     let pool = manager.get_active_pool()?;
-    executor::execute_query(pool, &sql, limit, offset).await
+    executor::execute_query(pool, &sql, limit, offset, &pids, &connection_id).await
 }
 
 #[tauri::command]
 pub async fn preview_table(
     state: State<'_, SharedConnectionManager>,
+    pids: State<'_, ActiveQueryPids>,
     schema: String,
     table: String,
 ) -> Result<QueryResult, String> {
     let manager = state.lock().await;
+    let connection_id = manager.active_id().ok_or("No active connection")?.to_string();
     let pool = manager.get_active_pool()?;
 
     // Get total count
@@ -36,7 +41,7 @@ pub async fn preview_table(
 
     // Get data
     let select_sql = format!("SELECT * FROM \"{}\".\"{}\" LIMIT 1000", schema, table);
-    let mut result = executor::execute_query(pool, &select_sql, None, None).await?;
+    let mut result = executor::execute_query(pool, &select_sql, None, None, &pids, &connection_id).await?;
     result.total_rows = Some(total);
 
     Ok(result)
@@ -45,11 +50,13 @@ pub async fn preview_table(
 #[tauri::command]
 pub async fn export_csv(
     state: State<'_, SharedConnectionManager>,
+    pids: State<'_, ActiveQueryPids>,
     sql: String,
 ) -> Result<String, String> {
     let manager = state.lock().await;
+    let connection_id = manager.active_id().ok_or("No active connection")?.to_string();
     let pool = manager.get_active_pool()?;
-    let result = executor::execute_query(pool, &sql, None, None).await?;
+    let result = executor::execute_query(pool, &sql, None, None, &pids, &connection_id).await?;
 
     if result.columns.is_empty() {
         return Ok(String::new());
@@ -83,4 +90,15 @@ pub async fn export_csv(
     }
 
     Ok(csv)
+}
+
+#[tauri::command]
+pub async fn cancel_query(
+    state: State<'_, SharedConnectionManager>,
+    pids: State<'_, ActiveQueryPids>,
+) -> Result<(), String> {
+    let manager = state.lock().await;
+    let connection_id = manager.active_id().ok_or("No active connection")?.to_string();
+    let pool = manager.get_active_pool()?;
+    executor::cancel_query(pool, &pids, &connection_id).await
 }

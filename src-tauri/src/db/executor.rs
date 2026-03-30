@@ -1,17 +1,51 @@
 use sqlx::{Column, PgPool, Row, TypeInfo};
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Instant;
+use tokio::sync::Mutex;
 
 use crate::models::result::{ColumnMeta, QueryResult};
+
+/// Maps connection_id -> PostgreSQL backend PID for active queries
+pub type ActiveQueryPids = Arc<Mutex<HashMap<String, i32>>>;
+
+pub fn create_active_query_pids() -> ActiveQueryPids {
+    Arc::new(Mutex::new(HashMap::new()))
+}
 
 pub async fn execute_query(
     pool: &PgPool,
     sql: &str,
     limit: Option<i64>,
     offset: Option<i64>,
+    active_pids: &ActiveQueryPids,
+    connection_id: &str,
 ) -> Result<QueryResult, String> {
     let start = Instant::now();
 
+    // Get and store the backend PID for cancellation support
+    let pid: i32 = sqlx::query_scalar("SELECT pg_backend_pid()")
+        .fetch_one(pool)
+        .await
+        .map_err(|e| format!("Failed to get backend PID: {}", e))?;
+
+    active_pids.lock().await.insert(connection_id.to_string(), pid);
+
+    let result = execute_query_inner(pool, sql, limit, offset, start).await;
+
+    // Always clean up PID, even on error
+    active_pids.lock().await.remove(connection_id);
+
+    result
+}
+
+async fn execute_query_inner(
+    pool: &PgPool,
+    sql: &str,
+    limit: Option<i64>,
+    offset: Option<i64>,
+    start: Instant,
+) -> Result<QueryResult, String> {
     // For SELECT queries, wrap with limit/offset if not already present
     let sql_upper = sql.trim().to_uppercase();
     let is_select = sql_upper.starts_with("SELECT") || sql_upper.starts_with("WITH");
@@ -93,6 +127,27 @@ pub async fn execute_query(
             affected_rows: Some(result.rows_affected()),
         })
     }
+}
+
+pub async fn cancel_query(
+    pool: &PgPool,
+    active_pids: &ActiveQueryPids,
+    connection_id: &str,
+) -> Result<(), String> {
+    let pid = {
+        let pids = active_pids.lock().await;
+        pids.get(connection_id).copied()
+    };
+
+    let pid = pid.ok_or("No active query to cancel")?;
+
+    sqlx::query("SELECT pg_cancel_backend($1)")
+        .bind(pid)
+        .execute(pool)
+        .await
+        .map_err(|e| format!("Failed to cancel query: {}", e))?;
+
+    Ok(())
 }
 
 fn pg_value_to_json(row: &sqlx::postgres::PgRow, ordinal: usize, type_name: &str) -> serde_json::Value {
