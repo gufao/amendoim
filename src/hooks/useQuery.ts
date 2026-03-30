@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { useQueryStore, type QueryTab } from "../stores/queryStore";
+import { getSelectedText } from "../lib/editor";
 
 /**
  * Shared hook that derives the active tab with a stability optimization:
@@ -42,7 +43,8 @@ export function useEditorQuery() {
     if (isExecuting) {
       cancelQuery(activeTabId);
     } else {
-      executeQuery(activeTabId);
+      const selected = getSelectedText();
+      executeQuery(activeTabId, selected || undefined);
     }
   }, [activeTabId, isExecuting, executeQuery, cancelQuery]);
 
@@ -89,7 +91,8 @@ export function useTabsQuery() {
 
   const executeActiveQuery = useCallback(() => {
     if (activeTab?.id) {
-      executeQuery(activeTab.id);
+      const selected = getSelectedText();
+      executeQuery(activeTab.id, selected || undefined);
     }
   }, [activeTab?.id, executeQuery]);
 

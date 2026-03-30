@@ -2,6 +2,7 @@ import Editor, { type OnMount } from "@monaco-editor/react";
 import { useCallback, useRef, useEffect } from "react";
 import { useEditorQuery } from "../../hooks/useQuery";
 import { useT } from "../../i18n";
+import { setEditorInstance } from "../../lib/editor";
 
 export function SqlEditor() {
   const t = useT();
@@ -21,6 +22,7 @@ export function SqlEditor() {
 
   const handleMount: OnMount = useCallback((editor, monaco) => {
     editorRef.current = editor;
+    setEditorInstance(editor);
 
     monaco.editor.defineTheme("amendoim-dark", {
       base: "vs-dark",

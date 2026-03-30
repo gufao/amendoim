@@ -49,7 +49,7 @@ interface QueryState {
   setActiveTab: (id: string) => void;
   updateSql: (id: string, sql: string) => void;
   updateTitle: (id: string, title: string) => void;
-  executeQuery: (id: string) => Promise<void>;
+  executeQuery: (id: string, sqlOverride?: string) => Promise<void>;
   cancelQuery: (id: string) => Promise<void>;
   previewTable: (schema: string, table: string) => Promise<void>;
   addFilter: (id: string) => void;
@@ -152,9 +152,11 @@ export const useQueryStore = create<QueryState>((set, get) => ({
     }));
   },
 
-  executeQuery: async (id) => {
+  executeQuery: async (id, sqlOverride) => {
     const tab = get().tabs.find((t) => t.id === id);
-    if (!tab || !tab.sql.trim()) return;
+    if (!tab) return;
+    const sql = sqlOverride?.trim() || tab.sql.trim();
+    if (!sql) return;
 
     set((s) => ({
       tabs: s.tabs.map((t) =>
@@ -164,7 +166,7 @@ export const useQueryStore = create<QueryState>((set, get) => ({
 
     try {
       const result = await api.executeQuery(
-        tab.sql,
+        sql,
         tab.pageSize,
         tab.page * tab.pageSize
       );
