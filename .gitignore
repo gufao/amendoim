@@ -49,3 +49,6 @@ src-tauri/icons/icon.ico
 
 # Test scripts
 test-mcp.sh
+
+# Docs (specs/plans)
+docs/
