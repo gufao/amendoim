@@ -117,23 +117,9 @@ export function SqlEditor() {
   }
 
   return (
-    <div className="flex-1 min-h-0 relative">
-      <Editor
-        height="100%"
-        language="sql"
-        theme="amendoim-dark"
-        value={sql}
-        onChange={(value) => updateSql(value || "")}
-        onMount={handleMount}
-        loading={
-          <div className="flex items-center justify-center h-full bg-bg-secondary text-text-faint text-xs">
-            <div className="w-4 h-4 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
-          </div>
-        }
-      />
-
-      {/* Run / Stop button overlay */}
-      <div className="absolute top-3 right-4 z-10 flex items-center gap-2">
+    <div className="flex-1 min-h-0 flex flex-col">
+      {/* Run / Stop button bar */}
+      <div className="flex items-center justify-end gap-2 px-4 py-2 bg-bg-secondary border-b border-border shrink-0">
         <span className="text-[10px] text-text-faint">{"\u2318"}Enter</span>
         {isExecuting ? (
           <button
@@ -155,6 +141,22 @@ export function SqlEditor() {
             <span>{t("editor.run")}</span>
           </button>
         )}
+      </div>
+
+      <div className="flex-1 min-h-0">
+        <Editor
+          height="100%"
+          language="sql"
+          theme="amendoim-dark"
+          value={sql}
+          onChange={(value) => updateSql(value || "")}
+          onMount={handleMount}
+          loading={
+            <div className="flex items-center justify-center h-full bg-bg-secondary text-text-faint text-xs">
+              <div className="w-4 h-4 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
+            </div>
+          }
+        />
       </div>
     </div>
   );
