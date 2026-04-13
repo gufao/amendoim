@@ -12,33 +12,42 @@ import { useT } from "../../i18n";
 import { exportCsv } from "../../lib/tauri";
 
 export function ResultsToolbar() {
-  const { activeTab, setPage, setPageSize, savePendingChanges, discardPendingChanges } =
-    useToolbarQuery();
+  const {
+    result,
+    page,
+    pageSize,
+    sql,
+    title,
+    pendingChanges,
+    setPage,
+    setPageSize,
+    savePendingChanges,
+    discardPendingChanges,
+  } = useToolbarQuery();
   const t = useT();
   const [exporting, setExporting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  if (!activeTab?.result) return null;
+  if (!result) return null;
 
-  const { result, page, pageSize } = activeTab;
   const hasMore = result.row_count >= pageSize;
 
-  const pendingCount = Object.values(activeTab.pendingChanges || {}).reduce(
+  const pendingCount = Object.values(pendingChanges || {}).reduce(
     (sum, changes) => sum + Object.keys(changes).length,
     0
   );
 
   const handleExport = async () => {
-    if (!activeTab.sql.trim()) return;
+    if (!sql.trim()) return;
     setExporting(true);
     try {
-      const csv = await exportCsv(activeTab.sql);
+      const csv = await exportCsv(sql);
       const blob = new Blob([csv], { type: "text/csv" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${activeTab.title || "query"}_results.csv`;
+      a.download = `${title || "query"}_results.csv`;
       a.click();
       URL.revokeObjectURL(url);
     } catch {
@@ -52,7 +61,7 @@ export function ResultsToolbar() {
     setSaving(true);
     setSaveError(null);
     try {
-      await savePendingChanges(activeTab.id);
+      await savePendingChanges();
     } catch (e) {
       const msg = String(e);
       if (msg.includes("NO_PRIMARY_KEY")) {
@@ -67,7 +76,7 @@ export function ResultsToolbar() {
 
   const handleDiscard = () => {
     setSaveError(null);
-    discardPendingChanges(activeTab.id);
+    discardPendingChanges();
   };
 
   return (
@@ -124,7 +133,7 @@ export function ResultsToolbar() {
           <span className="text-text-faint">{t("results.rows")}</span>
           <select
             value={pageSize}
-            onChange={(e) => setPageSize(activeTab.id, parseInt(e.target.value))}
+            onChange={(e) => setPageSize(parseInt(e.target.value))}
             className="bg-bg-primary border border-border rounded-md px-1.5 py-0.5 text-[11px] text-text-secondary focus:outline-none focus:border-border-focus cursor-pointer"
           >
             <option value={50}>50</option>
@@ -136,7 +145,7 @@ export function ResultsToolbar() {
 
         <div className="flex items-center gap-0.5">
           <button
-            onClick={() => setPage(activeTab.id, page - 1)}
+            onClick={() => setPage(page - 1)}
             disabled={page === 0}
             className="p-1 rounded-md hover:bg-bg-hover disabled:opacity-20 text-text-muted transition-colors"
           >
@@ -146,7 +155,7 @@ export function ResultsToolbar() {
             {page + 1}
           </span>
           <button
-            onClick={() => setPage(activeTab.id, page + 1)}
+            onClick={() => setPage(page + 1)}
             disabled={!hasMore}
             className="p-1 rounded-md hover:bg-bg-hover disabled:opacity-20 text-text-muted transition-colors"
           >
