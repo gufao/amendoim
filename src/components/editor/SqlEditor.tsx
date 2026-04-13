@@ -1,15 +1,15 @@
 import Editor, { type OnMount } from "@monaco-editor/react";
 import { useCallback, useRef, useEffect } from "react";
+import { Play, Square, Loader2 } from "lucide-react";
 import { useEditorQuery } from "../../hooks/useQuery";
 import { useT } from "../../i18n";
 import { setEditorInstance } from "../../lib/editor";
 
 export function SqlEditor() {
   const t = useT();
-  const { activeTab, updateSql, executeActiveQuery } = useEditorQuery();
+  const { activeQueryId, sql, isExecuting, updateSql, executeActiveQuery } = useEditorQuery();
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
 
-  // Resize editor when parent size changes (replaces automaticLayout polling)
   useEffect(() => {
     if (!editorRef.current) return;
     const observer = new ResizeObserver(() => {
@@ -18,7 +18,7 @@ export function SqlEditor() {
     const container = editorRef.current.getContainerDomNode().parentElement;
     if (container) observer.observe(container);
     return () => observer.disconnect();
-  }, [activeTab?.id]);
+  }, [activeQueryId]);
 
   const handleMount: OnMount = useCallback((editor, monaco) => {
     editorRef.current = editor;
@@ -108,7 +108,7 @@ export function SqlEditor() {
     editor.focus();
   }, [executeActiveQuery]);
 
-  if (!activeTab) {
+  if (!activeQueryId) {
     return (
       <div className="flex-1 flex items-center justify-center bg-bg-primary text-text-faint text-xs">
         {t("editor.empty")}
@@ -117,13 +117,13 @@ export function SqlEditor() {
   }
 
   return (
-    <div className="flex-1 min-h-0">
+    <div className="flex-1 min-h-0 relative">
       <Editor
         height="100%"
         language="sql"
         theme="amendoim-dark"
-        value={activeTab.sql}
-        onChange={(value) => updateSql(activeTab.id, value || "")}
+        value={sql}
+        onChange={(value) => updateSql(value || "")}
         onMount={handleMount}
         loading={
           <div className="flex items-center justify-center h-full bg-bg-secondary text-text-faint text-xs">
@@ -131,6 +131,31 @@ export function SqlEditor() {
           </div>
         }
       />
+
+      {/* Run / Stop button overlay */}
+      <div className="absolute top-3 right-4 z-10 flex items-center gap-2">
+        <span className="text-[10px] text-text-faint">{"\u2318"}Enter</span>
+        {isExecuting ? (
+          <button
+            onClick={executeActiveQuery}
+            className="flex items-center gap-1.5 pl-3 pr-3.5 py-1.5 rounded-lg text-xs font-medium bg-error hover:bg-error/80 text-white transition-all active:scale-[0.97] shadow-sm"
+            title={t("editor.stop")}
+          >
+            <Square size={13} fill="currentColor" />
+            <span>{t("editor.stop")}</span>
+          </button>
+        ) : (
+          <button
+            onClick={executeActiveQuery}
+            disabled={!sql.trim()}
+            className="flex items-center gap-1.5 pl-3 pr-3.5 py-1.5 rounded-lg text-xs font-medium bg-accent hover:bg-accent-hover text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-[0.97] shadow-sm shadow-accent/20"
+            title={t("editor.run")}
+          >
+            <Play size={13} fill="currentColor" />
+            <span>{t("editor.run")}</span>
+          </button>
+        )}
+      </div>
     </div>
   );
 }
