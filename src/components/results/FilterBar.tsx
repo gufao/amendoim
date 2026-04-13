@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from "react";
-import { Plus, X, Search } from "lucide-react";
-import { useQueryStore, FILTER_OPERATORS, ANY_COLUMN_OPERATORS, ANY_COLUMN_VALUE } from "../../stores/queryStore";
+import { Plus, X, Search, Code2, Copy, Check } from "lucide-react";
+import { useQueryStore, FILTER_OPERATORS, ANY_COLUMN_OPERATORS, ANY_COLUMN_VALUE, buildFilteredSql } from "../../stores/queryStore";
 import { useFilterQuery } from "../../hooks/useQuery";
 import { useT } from "../../i18n";
 
@@ -46,6 +46,94 @@ function FilterValueInput({
       placeholder={placeholder}
       className="filter-input flex-1 min-w-[80px] max-w-[200px]"
     />
+  );
+}
+
+function SqlPreview({
+  schema,
+  table,
+  filters,
+  columns,
+}: {
+  schema: string;
+  table: string;
+  filters: import("../../stores/queryStore").Filter[];
+  columns: { name: string }[];
+}) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  const allColumnNames = columns.map((c) => c.name);
+  const sql = buildFilteredSql(schema, table, filters, 1000, allColumnNames);
+
+  // Format SQL for readability
+  const formatted = sql
+    .replace(/ WHERE /i, "\nWHERE ")
+    .replace(/ AND /gi, "\n  AND ")
+    .replace(/ OR /gi, "\n   OR ")
+    .replace(/ LIMIT /i, "\nLIMIT ");
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(sql);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="relative" ref={popoverRef}>
+      <button
+        onClick={() => setOpen(!open)}
+        className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] transition-colors ${
+          open
+            ? "bg-accent-subtle text-accent"
+            : "text-text-muted hover:bg-bg-hover hover:text-text-secondary"
+        }`}
+        title={t("filter.previewSql")}
+      >
+        <Code2 size={11} />
+        SQL
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-1.5 z-30 w-[480px] bg-bg-elevated border border-border rounded-lg shadow-2xl shadow-black/40 animate-fade-in">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+            <span className="text-[11px] font-medium text-text-secondary">{t("filter.previewSql")}</span>
+            <button
+              onClick={handleCopy}
+              className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium hover:bg-bg-hover text-text-muted hover:text-text-primary transition-colors"
+            >
+              {copied ? (
+                <>
+                  <Check size={10} className="text-success" />
+                  {t("filter.copiedSql")}
+                </>
+              ) : (
+                <>
+                  <Copy size={10} />
+                  {t("cellViewer.copy")}
+                </>
+              )}
+            </button>
+          </div>
+          <pre className="px-3 py-2.5 text-xs font-mono text-accent leading-relaxed whitespace-pre-wrap break-all overflow-auto max-h-[200px]">
+            {formatted}
+          </pre>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -181,6 +269,12 @@ export function FilterBar() {
             <Search size={11} />
             {t("filter.apply")}
           </button>
+        )}
+
+        {hasFilters && (
+          <div className="ml-auto">
+            <SqlPreview schema={tableContext.schema} table={tableContext.table} filters={filters} columns={columns} />
+          </div>
         )}
       </div>
     </div>

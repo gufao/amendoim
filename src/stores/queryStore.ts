@@ -76,7 +76,7 @@ function toSqlLiteral(value: unknown): string {
   return `'${escaped}'`;
 }
 
-function buildFilterClause(f: Filter, allColumns?: string[]): string {
+export function buildFilterClause(f: Filter, allColumns?: string[]): string {
   if (f.column === ANY_COLUMN_VALUE) {
     if (!allColumns || allColumns.length === 0) return "TRUE";
     const escaped = f.value.replace(/'/g, "''");
@@ -100,7 +100,7 @@ function buildFilterClause(f: Filter, allColumns?: string[]): string {
   return `"${f.column}" ${f.operator} '${escaped}'`;
 }
 
-function buildFilteredSql(
+export function buildFilteredSql(
   schema: string,
   table: string,
   filters: Filter[],

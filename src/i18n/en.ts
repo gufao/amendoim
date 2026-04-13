@@ -86,6 +86,8 @@ export const en: Record<TranslationKey, string> = {
   "filter.off": "OFF",
   "filter.add": "Add filter",
   "filter.apply": "Apply",
+  "filter.previewSql": "View SQL",
+  "filter.copiedSql": "Copied!",
 
   // Filter operators
   "filter.op.equals": "equals",

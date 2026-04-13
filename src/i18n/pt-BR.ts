@@ -84,6 +84,8 @@ export const ptBR = {
   "filter.off": "OFF",
   "filter.add": "Adicionar filtro",
   "filter.apply": "Aplicar",
+  "filter.previewSql": "Ver SQL",
+  "filter.copiedSql": "Copiado!",
 
   // Filter operators
   "filter.op.equals": "igual",
