@@ -13,11 +13,10 @@ export function StatusBar({
   const t = useT();
   const connections = useConnectionStore((s) => s.connections);
   const activeConnectionId = useConnectionStore((s) => s.activeConnectionId);
-  const { activeTab } = useStatusQuery();
+  const { result, error } = useStatusQuery();
   const mcpIsRunning = useMcpStore((s) => s.isRunning);
 
   const activeConn = connections.find((c) => c.id === activeConnectionId);
-  const result = activeTab?.result;
 
   return (
     <div className="h-7 bg-bg-secondary border-t border-border flex items-center px-3 text-[11px] text-text-muted select-none gap-3">
@@ -70,10 +69,10 @@ export function StatusBar({
         </div>
       )}
 
-      {activeTab?.error && (
+      {error && (
         <div className="flex items-center gap-1 text-error">
           <span className="w-1.5 h-1.5 rounded-full bg-error" />
-          <span className="truncate max-w-xs">{activeTab.error}</span>
+          <span className="truncate max-w-xs">{error}</span>
         </div>
       )}
 
