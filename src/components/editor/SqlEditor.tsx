@@ -1,6 +1,6 @@
 import Editor, { type OnMount } from "@monaco-editor/react";
 import { useCallback, useRef, useEffect } from "react";
-import { Play, Square, Loader2 } from "lucide-react";
+import { Play, Square } from "lucide-react";
 import { useEditorQuery } from "../../hooks/useQuery";
 import { useT } from "../../i18n";
 import { setEditorInstance } from "../../lib/editor";

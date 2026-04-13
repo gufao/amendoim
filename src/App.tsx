@@ -1,12 +1,12 @@
-import { useEffect, useCallback, useState, useRef } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { AlertCircle, X } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { Sidebar } from "./components/layout/Sidebar";
-import { TopBar } from "./components/layout/TopBar";
 import { StatusBar } from "./components/layout/StatusBar";
 import { SqlEditor } from "./components/editor/SqlEditor";
 import { ResultsTable } from "./components/results/ResultsTable";
 import { useQueryStore } from "./stores/queryStore";
+import { useQueryFileStore } from "./stores/queryFileStore";
 import { useConnectionStore } from "./stores/connectionStore";
 import { ConnectionModal } from "./components/connection/ConnectionModal";
 import { McpModal } from "./components/mcp/McpModal";
@@ -16,98 +16,87 @@ import { useT } from "./i18n";
 import { trackEvent } from "./lib/analytics";
 
 function App() {
-  const addTab = useQueryStore((s) => s.addTab);
-  const removeTab = useQueryStore((s) => s.removeTab);
-  const activeTabId = useQueryStore((s) => s.activeTabId);
+  const activeView = useQueryStore((s) => s.activeView);
+  const activeQueryId = useQueryStore((s) => s.activeQueryId);
+  const setActiveQueryId = useQueryStore((s) => s.setActiveQueryId);
+  const setActiveView = useQueryStore((s) => s.setActiveView);
+  const setSql = useQueryStore((s) => s.setSql);
+  const resetDataState = useQueryStore((s) => s.resetDataState);
   const executeQuery = useQueryStore((s) => s.executeQuery);
-  const tabs = useQueryStore((s) => s.tabs);
+
+  const addQuery = useQueryFileStore((s) => s.addQuery);
+  const removeQuery = useQueryFileStore((s) => s.removeQuery);
+  const queries = useQueryFileStore((s) => s.queries);
+  const loadQueries = useQueryFileStore((s) => s.loadQueries);
+
   const activeConnectionId = useConnectionStore((s) => s.activeConnectionId);
   const loadConnections = useConnectionStore((s) => s.loadConnections);
   const connectionError = useConnectionStore((s) => s.error);
   const setConnectionError = useConnectionStore((s) => s.setError);
 
-  const [editorHeight, setEditorHeight] = useState(280);
-  const [isDragging, setIsDragging] = useState(false);
   const [showConnectionModal, setShowConnectionModal] = useState(false);
   const [showMcpModal, setShowMcpModal] = useState(false);
   const [editingConnection, setEditingConnection] = useState<ConnectionConfig | null>(null);
 
-  // Load saved connections and create initial tab on startup
+  const t = useT();
+
   useEffect(() => {
     trackEvent("app_opened");
     loadConnections();
-    if (tabs.length === 0) {
-      addTab();
-    }
+    loadQueries();
   }, []);
 
-  // Listen for MCP execute-query events from AI assistants
   useEffect(() => {
     const unlisten = listen<{ sql: string; title: string }>(
       "mcp-execute-query",
       (event) => {
         const { sql, title } = event.payload;
-        const tabId = addTab(title, sql);
-        executeQuery(tabId);
+        const query = addQuery(title, sql);
+        setActiveQueryId(query.id);
+        setSql(sql);
+        executeQuery();
       }
     );
     return () => {
       unlisten.then((f) => f());
     };
-  }, [addTab, executeQuery]);
+  }, [addQuery, setActiveQueryId, setSql, executeQuery]);
 
-  // Global keyboard shortcuts
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       const meta = e.metaKey || e.ctrlKey;
       if (meta && e.key === "n") {
         e.preventDefault();
-        addTab();
+        const query = addQuery();
+        setActiveQueryId(query.id);
+        setSql(query.sql);
+        setActiveView("editor");
+        resetDataState();
       }
       if (meta && e.key === "w") {
         e.preventDefault();
-        if (activeTabId) removeTab(activeTabId);
-      }
-      if (meta && e.key === "Enter") {
-        e.preventDefault();
-        if (activeTabId) executeQuery(activeTabId);
+        if (activeQueryId) {
+          if (confirm(t("query.deleteConfirm"))) {
+            removeQuery(activeQueryId);
+            const remaining = queries.filter((q) => q.id !== activeQueryId);
+            if (remaining.length > 0) {
+              setActiveQueryId(remaining[0].id);
+              setSql(remaining[0].sql);
+            } else {
+              setActiveQueryId(null);
+              setSql("");
+            }
+          }
+        }
       }
     },
-    [activeTabId, addTab, removeTab, executeQuery]
+    [activeQueryId, addQuery, removeQuery, queries, setActiveQueryId, setSql, setActiveView, resetDataState, t]
   );
 
   useEffect(() => {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
-
-  // Resize splitter (throttled with rAF)
-  const handleMouseDown = useCallback(() => setIsDragging(true), []);
-  const rafRef = useRef(0);
-
-  useEffect(() => {
-    if (!isDragging) return;
-    const handleMouseMove = (e: MouseEvent) => {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = requestAnimationFrame(() => {
-        const container = document.getElementById("editor-results");
-        if (!container) return;
-        const rect = container.getBoundingClientRect();
-        setEditorHeight(Math.max(80, Math.min(e.clientY - rect.top, rect.height - 80)));
-      });
-    };
-    const handleMouseUp = () => {
-      cancelAnimationFrame(rafRef.current);
-      setIsDragging(false);
-    };
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-    return () => {
-      cancelAnimationFrame(rafRef.current);
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [isDragging]);
 
   return (
     <div className="h-full flex flex-col bg-bg-primary">
@@ -118,34 +107,12 @@ function App() {
         />
 
         <div className="flex-1 flex flex-col min-w-0">
-          <TopBar />
-
           {!activeConnectionId ? (
             <WelcomeScreen onConnect={() => setShowConnectionModal(true)} />
+          ) : activeView === "editor" ? (
+            <SqlEditor />
           ) : (
-            <div id="editor-results" className="flex-1 flex flex-col min-h-0">
-              <div style={{ height: editorHeight }} className="flex flex-col shrink-0">
-                <SqlEditor />
-              </div>
-
-              {/* Resize handle */}
-              <div
-                className={`h-[5px] flex items-center justify-center cursor-row-resize group transition-colors ${
-                  isDragging
-                    ? "bg-accent/20"
-                    : "bg-bg-secondary hover:bg-accent/10"
-                }`}
-                onMouseDown={handleMouseDown}
-              >
-                <div className={`w-8 h-[3px] rounded-full transition-colors ${
-                  isDragging ? "bg-accent/40" : "bg-border group-hover:bg-text-muted"
-                }`} />
-              </div>
-
-              <div className="flex-1 min-h-0 flex flex-col">
-                <ResultsTable />
-              </div>
-            </div>
+            <ResultsTable />
           )}
         </div>
       </div>
