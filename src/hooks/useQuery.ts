@@ -1,112 +1,124 @@
-import { useCallback, useMemo } from "react";
-import { useQueryStore, type QueryTab } from "../stores/queryStore";
+import { useCallback } from "react";
+import { useQueryStore } from "../stores/queryStore";
+import { useQueryFileStore } from "../stores/queryFileStore";
 import { getSelectedText } from "../lib/editor";
 
 /**
- * Shared hook that derives the active tab with a stability optimization:
- * only triggers a re-render when the tab's content actually changes
- * (by comparing individual fields), not when unrelated tabs change.
- *
- * The `fields` parameter controls which tab fields are compared — if only
- * those fields changed, the consumer re-renders; changes to other fields
- * are ignored.
- */
-function useActiveTab(): QueryTab | null {
-  const tabs = useQueryStore((s) => s.tabs);
-  const activeTabId = useQueryStore((s) => s.activeTabId);
-  return useMemo(
-    () => tabs.find((t) => t.id === activeTabId) || null,
-    [tabs, activeTabId]
-  );
-}
-
-/**
- * Editor hook — only needs sql/id from the active tab.
- * Uses a ref to avoid re-renders when non-sql fields change.
+ * Editor hook — provides SQL and execution for the active query.
  */
 export function useEditorQuery() {
-  const activeTabId = useQueryStore((s) => s.activeTabId);
-  const isExecuting = useQueryStore((s) => {
-    if (!s.activeTabId) return false;
-    return s.tabs.find((t) => t.id === s.activeTabId)?.isExecuting ?? false;
-  });
-  const sql = useQueryStore((s) => {
-    if (!s.activeTabId) return "";
-    return s.tabs.find((t) => t.id === s.activeTabId)?.sql ?? "";
-  });
-  const updateSql = useQueryStore((s) => s.updateSql);
+  const activeQueryId = useQueryStore((s) => s.activeQueryId);
+  const isExecuting = useQueryStore((s) => s.isExecuting);
+  const sql = useQueryStore((s) => s.sql);
+  const setSql = useQueryStore((s) => s.setSql);
   const executeQuery = useQueryStore((s) => s.executeQuery);
   const cancelQuery = useQueryStore((s) => s.cancelQuery);
+  const updateQueryFile = useQueryFileStore((s) => s.updateQuery);
+
+  const handleSqlChange = useCallback(
+    (newSql: string) => {
+      setSql(newSql);
+      if (activeQueryId) {
+        updateQueryFile(activeQueryId, { sql: newSql });
+      }
+    },
+    [activeQueryId, setSql, updateQueryFile]
+  );
 
   const toggleActiveQuery = useCallback(() => {
-    if (!activeTabId) return;
     if (isExecuting) {
-      cancelQuery(activeTabId);
+      cancelQuery();
     } else {
       const selected = getSelectedText();
-      executeQuery(activeTabId, selected || undefined);
+      executeQuery(selected || undefined);
     }
-  }, [activeTabId, isExecuting, executeQuery, cancelQuery]);
+  }, [isExecuting, executeQuery, cancelQuery]);
 
   return {
-    activeTab: activeTabId ? { id: activeTabId, sql } : null,
-    updateSql,
+    activeQueryId,
+    sql,
+    isExecuting,
+    updateSql: handleSqlChange,
     executeActiveQuery: toggleActiveQuery,
   };
 }
 
-/** Active tab data for the results table. */
+/** Active query data for the results table. */
 export function useResultsQuery() {
-  const activeTab = useActiveTab();
+  const result = useQueryStore((s) => s.result);
+  const isExecuting = useQueryStore((s) => s.isExecuting);
+  const error = useQueryStore((s) => s.error);
+  const tableContext = useQueryStore((s) => s.tableContext);
+  const pendingChanges = useQueryStore((s) => s.pendingChanges);
+  const selectedRowIndex = useQueryStore((s) => s.selectedRowIndex);
+  const page = useQueryStore((s) => s.page);
+  const pageSize = useQueryStore((s) => s.pageSize);
   const updateCellValue = useQueryStore((s) => s.updateCellValue);
-  return { activeTab, updateCellValue };
+  const setSelectedRowIndex = useQueryStore((s) => s.setSelectedRowIndex);
+
+  return {
+    result,
+    isExecuting,
+    error,
+    tableContext,
+    pendingChanges,
+    selectedRowIndex,
+    page,
+    pageSize,
+    updateCellValue,
+    setSelectedRowIndex,
+  };
 }
 
-/** Active tab data for the filter bar. */
+/** Active query data for the filter bar. */
 export function useFilterQuery() {
-  const activeTab = useActiveTab();
-  return { activeTab };
+  const result = useQueryStore((s) => s.result);
+  const tableContext = useQueryStore((s) => s.tableContext);
+  const filters = useQueryStore((s) => s.filters);
+  return { result, tableContext, filters };
 }
 
-/** Active tab data for the results toolbar. */
+/** Active query data for the results toolbar. */
 export function useToolbarQuery() {
-  const activeTab = useActiveTab();
+  const result = useQueryStore((s) => s.result);
+  const isExecuting = useQueryStore((s) => s.isExecuting);
+  const error = useQueryStore((s) => s.error);
+  const page = useQueryStore((s) => s.page);
+  const pageSize = useQueryStore((s) => s.pageSize);
+  const sql = useQueryStore((s) => s.sql);
+  const tableContext = useQueryStore((s) => s.tableContext);
+  const pendingChanges = useQueryStore((s) => s.pendingChanges);
   const setPage = useQueryStore((s) => s.setPage);
   const setPageSize = useQueryStore((s) => s.setPageSize);
   const savePendingChanges = useQueryStore((s) => s.savePendingChanges);
   const discardPendingChanges = useQueryStore((s) => s.discardPendingChanges);
-  return { activeTab, setPage, setPageSize, savePendingChanges, discardPendingChanges };
+
+  const title = useQueryFileStore((s) => {
+    const activeQueryId = useQueryStore.getState().activeQueryId;
+    return s.queries.find((q) => q.id === activeQueryId)?.title || "query";
+  });
+
+  return {
+    result,
+    isExecuting,
+    error,
+    page,
+    pageSize,
+    sql,
+    title,
+    tableContext,
+    pendingChanges,
+    setPage,
+    setPageSize,
+    savePendingChanges,
+    discardPendingChanges,
+  };
 }
 
-/** Tab list + actions for the top bar. */
-export function useTabsQuery() {
-  const tabs = useQueryStore((s) => s.tabs);
-  const activeTabId = useQueryStore((s) => s.activeTabId);
-  const activeTab = useActiveTab();
-  const setActiveTab = useQueryStore((s) => s.setActiveTab);
-  const removeTab = useQueryStore((s) => s.removeTab);
-  const addTab = useQueryStore((s) => s.addTab);
-  const executeQuery = useQueryStore((s) => s.executeQuery);
-  const cancelQuery = useQueryStore((s) => s.cancelQuery);
-
-  const executeActiveQuery = useCallback(() => {
-    if (activeTab?.id) {
-      const selected = getSelectedText();
-      executeQuery(activeTab.id, selected || undefined);
-    }
-  }, [activeTab?.id, executeQuery]);
-
-  const cancelActiveQuery = useCallback(() => {
-    if (activeTab?.id) {
-      cancelQuery(activeTab.id);
-    }
-  }, [activeTab?.id, cancelQuery]);
-
-  return { tabs, activeTabId, activeTab, setActiveTab, removeTab, addTab, executeActiveQuery, cancelActiveQuery };
-}
-
-/** Minimal active tab info for the status bar. */
+/** Minimal active info for the status bar. */
 export function useStatusQuery() {
-  const activeTab = useActiveTab();
-  return { activeTab };
+  const result = useQueryStore((s) => s.result);
+  const isExecuting = useQueryStore((s) => s.isExecuting);
+  const error = useQueryStore((s) => s.error);
+  return { result, isExecuting, error };
 }
