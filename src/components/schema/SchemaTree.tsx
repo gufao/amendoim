@@ -28,6 +28,7 @@ export function SchemaTree() {
   const t = useT();
 
   const handleTableClick = (schema: string, table: string) => {
+    selectTable(schema, table);
     previewTable(schema, table);
   };
 
@@ -84,7 +85,6 @@ export function SchemaTree() {
                         className="flex items-center gap-1.5 pl-7 pr-3 py-[5px] cursor-pointer hover:bg-bg-hover transition-colors"
                         onClick={() => {
                           toggleTable(schema.name, table.name);
-                          selectTable(schema.name, table.name);
                           handleTableClick(schema.name, table.name);
                         }}
                       >
