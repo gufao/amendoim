@@ -93,10 +93,13 @@ export function useToolbarQuery() {
   const savePendingChanges = useQueryStore((s) => s.savePendingChanges);
   const discardPendingChanges = useQueryStore((s) => s.discardPendingChanges);
 
-  const title = useQueryFileStore((s) => {
-    const activeQueryId = useQueryStore.getState().activeQueryId;
-    return s.queries.find((q) => q.id === activeQueryId)?.title || "query";
-  });
+  const activeQueryId = useQueryStore((s) => s.activeQueryId);
+  const title = useQueryFileStore(
+    useCallback(
+      (s) => s.queries.find((q) => q.id === activeQueryId)?.title || "query",
+      [activeQueryId]
+    )
+  );
 
   return {
     result,

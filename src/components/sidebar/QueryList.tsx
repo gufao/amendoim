@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { FileCode2, Plus, X } from "lucide-react";
+import { FileCode2, Plus, X, Check } from "lucide-react";
 import { useQueryFileStore } from "../../stores/queryFileStore";
 import { useQueryStore } from "../../stores/queryStore";
 import { useT } from "../../i18n";
@@ -18,6 +18,7 @@ export function QueryList() {
 
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const renameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -26,6 +27,13 @@ export function QueryList() {
       renameRef.current.select();
     }
   }, [renamingId]);
+
+  // Auto-cancel delete confirmation after 3s
+  useEffect(() => {
+    if (!confirmingDeleteId) return;
+    const timer = setTimeout(() => setConfirmingDeleteId(null), 3000);
+    return () => clearTimeout(timer);
+  }, [confirmingDeleteId]);
 
   const handleSelectQuery = (query: { id: string; sql: string }) => {
     setActiveQueryId(query.id);
@@ -39,18 +47,24 @@ export function QueryList() {
     handleSelectQuery(query);
   };
 
-  const handleDelete = (e: React.MouseEvent, id: string) => {
+  const handleDeleteClick = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    if (!confirm(t("query.deleteConfirm"))) return;
-    removeQuery(id);
-    if (activeQueryId === id) {
-      const remaining = queries.filter((q) => q.id !== id);
-      if (remaining.length > 0) {
-        handleSelectQuery(remaining[0]);
-      } else {
-        setActiveQueryId(null);
-        setSql("");
+    if (confirmingDeleteId === id) {
+      // Second click = confirm
+      removeQuery(id);
+      setConfirmingDeleteId(null);
+      if (activeQueryId === id) {
+        const remaining = queries.filter((q) => q.id !== id);
+        if (remaining.length > 0) {
+          handleSelectQuery(remaining[0]);
+        } else {
+          setActiveQueryId(null);
+          setSql("");
+        }
       }
+    } else {
+      // First click = ask confirmation
+      setConfirmingDeleteId(id);
     }
   };
 
@@ -73,14 +87,17 @@ export function QueryList() {
       {queries.map((query) => {
         const isActive = query.id === activeQueryId;
         const isRenaming = query.id === renamingId;
+        const isConfirmingDelete = query.id === confirmingDeleteId;
 
         return (
           <div
             key={query.id}
             className={`group flex items-center gap-1.5 px-3 py-[5px] cursor-pointer transition-colors ${
-              isActive
-                ? "bg-accent-subtle text-accent"
-                : "text-text-secondary hover:bg-bg-hover"
+              isConfirmingDelete
+                ? "bg-error/10 text-error"
+                : isActive
+                  ? "bg-accent-subtle text-accent"
+                  : "text-text-secondary hover:bg-bg-hover"
             }`}
             onClick={() => handleSelectQuery(query)}
             onDoubleClick={(e) => handleStartRename(e, query.id, query.title)}
@@ -99,19 +116,23 @@ export function QueryList() {
                 className="flex-1 bg-bg-primary border border-accent rounded px-1 py-0 text-xs text-text-primary outline-none min-w-0"
                 onClick={(e) => e.stopPropagation()}
               />
+            ) : isConfirmingDelete ? (
+              <span className="flex-1 truncate text-xs text-error">{t("query.deleteConfirm")}</span>
             ) : (
               <span className="flex-1 truncate text-xs">{query.title}</span>
             )}
             {!isRenaming && (
               <button
-                onClick={(e) => handleDelete(e, query.id)}
-                className={`p-0.5 rounded transition-opacity ${
-                  isActive
-                    ? "text-accent/60 hover:text-accent"
-                    : "opacity-0 group-hover:opacity-100 text-text-faint hover:text-error"
+                onClick={(e) => handleDeleteClick(e, query.id)}
+                className={`p-0.5 rounded transition-all ${
+                  isConfirmingDelete
+                    ? "text-error hover:text-error"
+                    : isActive
+                      ? "text-accent/60 hover:text-accent"
+                      : "opacity-0 group-hover:opacity-100 text-text-faint hover:text-error"
                 }`}
               >
-                <X size={10} />
+                {isConfirmingDelete ? <Check size={10} /> : <X size={10} />}
               </button>
             )}
           </div>

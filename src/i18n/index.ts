@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { useCallback } from "react";
 import { ptBR, type TranslationKey } from "./pt-BR";
 import { en } from "./en";
 
@@ -29,15 +30,18 @@ export function useT() {
   const locale = useI18nStore((s) => s.locale);
   const dict = translations[locale];
 
-  function t(key: TranslationKey, params?: Record<string, string | number>): string {
-    let str = dict[key] || ptBR[key] || key;
-    if (params) {
-      for (const [k, v] of Object.entries(params)) {
-        str = str.replace(`{${k}}`, String(v));
+  const t = useCallback(
+    (key: TranslationKey, params?: Record<string, string | number>): string => {
+      let str = dict[key] || ptBR[key] || key;
+      if (params) {
+        for (const [k, v] of Object.entries(params)) {
+          str = str.replace(`{${k}}`, String(v));
+        }
       }
-    }
-    return str;
-  }
+      return str;
+    },
+    [dict]
+  );
 
   return t;
 }

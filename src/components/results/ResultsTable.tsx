@@ -58,11 +58,13 @@ export function ResultsTable() {
 
   const isEditable = !!tableContext;
 
-  const schemaColumns = useSchemaStore((s) => {
-    if (!tableContext) return [];
-    const key = `${tableContext.schema}.${tableContext.table}`;
-    return s.columns[key] || [];
-  });
+  const schemaKey = tableContext ? `${tableContext.schema}.${tableContext.table}` : "";
+  const schemaColumns = useSchemaStore(
+    useCallback(
+      (s) => (schemaKey ? s.columns[schemaKey] : undefined),
+      [schemaKey]
+    )
+  ) ?? [];
   const pkColumns = useMemo(
     () => schemaColumns.filter((c) => c.is_primary_key).map((c) => c.name),
     [schemaColumns]
@@ -169,7 +171,8 @@ export function ResultsTable() {
       },
       size: Math.max(120, Math.min(300, col.name.length * 9 + 60)),
     }));
-  }, [result?.columns, pendingChanges, editingCell, t, handleCellDoubleClick, handleInlineEditSave, handleInlineEditTab]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- t and callbacks are stable enough; including them causes infinite re-render via useReactTable
+  }, [result?.columns, pendingChanges, editingCell]);
 
   const data = useMemo(() => result?.rows || [], [result?.rows]);
 

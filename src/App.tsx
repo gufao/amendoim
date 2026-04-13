@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from "react";
+import { useEffect, useCallback, useState, Component, type ReactNode, type ErrorInfo } from "react";
 import { AlertCircle, X } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { Sidebar } from "./components/layout/Sidebar";
@@ -76,16 +76,14 @@ function App() {
       if (meta && e.key === "w") {
         e.preventDefault();
         if (activeQueryId) {
-          if (confirm(t("query.deleteConfirm"))) {
-            removeQuery(activeQueryId);
-            const remaining = queries.filter((q) => q.id !== activeQueryId);
-            if (remaining.length > 0) {
-              setActiveQueryId(remaining[0].id);
-              setSql(remaining[0].sql);
-            } else {
-              setActiveQueryId(null);
-              setSql("");
-            }
+          removeQuery(activeQueryId);
+          const remaining = queries.filter((q) => q.id !== activeQueryId);
+          if (remaining.length > 0) {
+            setActiveQueryId(remaining[0].id);
+            setSql(remaining[0].sql);
+          } else {
+            setActiveQueryId(null);
+            setSql("");
           }
         }
       }
@@ -112,7 +110,7 @@ function App() {
           ) : activeView === "editor" ? (
             <SqlEditor />
           ) : (
-            <ResultsTable />
+            <ErrorBoundary><ResultsTable /></ErrorBoundary>
           )}
         </div>
       </div>
@@ -200,6 +198,26 @@ function ErrorToast({ message, onDismiss }: { message: string; onDismiss: () => 
       </div>
     </div>
   );
+}
+
+class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state = { error: null as Error | null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  componentDidCatch(error: Error, info: ErrorInfo) { console.error("ErrorBoundary caught:", error, info); }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="flex-1 flex items-center justify-center bg-bg-primary p-8">
+          <div className="rounded-lg border border-error/30 bg-error-muted p-6 max-w-lg">
+            <div className="text-sm font-semibold text-error mb-2">Component Error</div>
+            <pre className="text-xs text-text-secondary whitespace-pre-wrap font-mono">{this.state.error.message}</pre>
+            <pre className="text-[10px] text-text-faint whitespace-pre-wrap font-mono mt-2">{this.state.error.stack}</pre>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 export default App;
