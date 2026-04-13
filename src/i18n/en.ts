@@ -131,4 +131,27 @@ export const en: Record<TranslationKey, string> = {
   "mcp.privacyTitle": "Privacy:",
   "mcp.privacyNote": "The AI only accesses metadata (table names, columns, types). Query results are displayed only in the Amendoim app — the AI never sees your data.",
   "mcp.statusBar": "AI",
+
+  // Sidebar Queries
+  "sidebar.queries": "Queries",
+  "sidebar.newQuery": "+ New Query",
+
+  // Filter: Any Column
+  "filter.anyColumn": "Any column",
+  "filter.columns": "Columns",
+
+  // Row Detail
+  "rowDetail.title": "Row #{row}",
+  "rowDetail.copied": "Copied",
+  "rowDetail.close": "Close detail",
+
+  // Editor (new keys for embedded Run/Stop)
+  "editor.run": "Run",
+  "editor.stop": "Stop",
+
+  // Query files
+  "query.untitled": "SQL Query {n}",
+  "query.delete": "Delete query",
+  "query.rename": "Rename",
+  "query.deleteConfirm": "Are you sure you want to delete this query?",
 };

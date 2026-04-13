@@ -52,3 +52,4 @@ test-mcp.sh
 
 # Docs (specs/plans)
 docs/
+.superpowers/

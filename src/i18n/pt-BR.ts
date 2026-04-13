@@ -129,6 +129,29 @@ export const ptBR = {
   "mcp.privacyTitle": "Privacidade:",
   "mcp.privacyNote": "A IA acessa apenas metadados (nomes de tabelas, colunas, tipos). Os dados das consultas são exibidos somente na tela do Amendoim — a IA nunca vê os resultados.",
   "mcp.statusBar": "IA",
+
+  // Sidebar Queries
+  "sidebar.queries": "Queries",
+  "sidebar.newQuery": "+ Nova Query",
+
+  // Filter: Any Column
+  "filter.anyColumn": "Qualquer coluna",
+  "filter.columns": "Colunas",
+
+  // Row Detail
+  "rowDetail.title": "Linha #{row}",
+  "rowDetail.copied": "Copiado",
+  "rowDetail.close": "Fechar detalhe",
+
+  // Editor (new keys for embedded Run/Stop)
+  "editor.run": "Executar",
+  "editor.stop": "Parar",
+
+  // Query files
+  "query.untitled": "SQL Query {n}",
+  "query.delete": "Excluir query",
+  "query.rename": "Renomear",
+  "query.deleteConfirm": "Tem certeza que deseja excluir esta query?",
 } as const;
 
 export type TranslationKey = keyof typeof ptBR;
