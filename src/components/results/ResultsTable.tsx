@@ -13,22 +13,12 @@ import { useResultsQuery } from "../../hooks/useQuery";
 import { useSchemaStore } from "../../stores/schemaStore";
 import { useT } from "../../i18n";
 import { formatCellValue, truncate } from "../../lib/format";
-import { CellViewer } from "./CellViewer";
 import { FilterBar } from "./FilterBar";
 import { ResultsToolbar } from "./ResultsToolbar";
 import { RowDetail } from "./RowDetail";
 import { InlineEdit } from "./InlineEdit";
 
 const ROW_HEIGHT = 30;
-const LONG_VALUE_THRESHOLD = 100;
-
-function isLongOrJson(value: unknown): boolean {
-  if (value === null || value === undefined) return false;
-  if (typeof value === "object") return true;
-  const str = String(value);
-  if (str.length > LONG_VALUE_THRESHOLD) return true;
-  try { JSON.parse(str); return true; } catch { return false; }
-}
 
 export function ResultsTable() {
   const {
@@ -45,11 +35,6 @@ export function ResultsTable() {
   } = useResultsQuery();
   const t = useT();
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [viewingCell, setViewingCell] = useState<{
-    column: string;
-    value: unknown;
-    rowIndex: number;
-  } | null>(null);
   const [editingCell, setEditingCell] = useState<{
     rowIndex: number;
     column: string;
@@ -97,13 +82,9 @@ export function ResultsTable() {
   );
 
   const handleCellDoubleClick = useCallback(
-    (rowIndex: number, column: string, value: unknown) => {
+    (rowIndex: number, column: string) => {
       if (!isEditable) return;
-      if (isLongOrJson(value)) {
-        setViewingCell({ column, value, rowIndex });
-      } else {
-        setEditingCell({ rowIndex, column });
-      }
+      setEditingCell({ rowIndex, column });
     },
     [isEditable]
   );
@@ -162,7 +143,7 @@ export function ResultsTable() {
             }`}
             onDoubleClick={(e) => {
               e.stopPropagation();
-              handleCellDoubleClick(rowIndex, col.name, value);
+              handleCellDoubleClick(rowIndex, col.name);
             }}
           >
             {isNull ? t("results.null") : truncate(formatted, 80)}
@@ -411,22 +392,6 @@ export function ResultsTable() {
         </div>
       )}
 
-      {viewingCell && (
-        <CellViewer
-          column={viewingCell.column}
-          value={viewingCell.value}
-          editable={isEditable}
-          onClose={() => setViewingCell(null)}
-          onSave={
-            isEditable
-              ? (newValue) => {
-                  updateCellValue(viewingCell.rowIndex, viewingCell.column, newValue);
-                  setViewingCell(null);
-                }
-              : undefined
-          }
-        />
-      )}
     </div>
   );
 }

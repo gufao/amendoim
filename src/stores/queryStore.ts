@@ -270,8 +270,10 @@ export const useQueryStore = create<QueryState>((set, get) => ({
     if (!state.result) return;
 
     const originalValue = state.result.rows[rowIndex]?.[column];
-    const originalStr = originalValue === null || originalValue === undefined ? null : String(originalValue);
-    const newStr = value === null || value === undefined ? null : String(value);
+    const stringify = (v: unknown) =>
+      v === null || v === undefined ? null : typeof v === "object" ? JSON.stringify(v) : String(v);
+    const originalStr = stringify(originalValue);
+    const newStr = stringify(value);
 
     if (originalStr === newStr) {
       const rowChanges = { ...state.pendingChanges[rowIndex] };
