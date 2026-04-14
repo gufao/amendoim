@@ -71,8 +71,8 @@ export function StatusBar({
 
       {error && (
         <div className="flex items-center gap-1 text-error">
-          <span className="w-1.5 h-1.5 rounded-full bg-error" />
-          <span className="truncate max-w-xs">{error}</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-error flex-shrink-0" />
+          <span className="truncate max-w-md">{error}</span>
         </div>
       )}
 

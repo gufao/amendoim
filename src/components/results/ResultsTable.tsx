@@ -213,10 +213,10 @@ export function ResultsTable() {
 
     if (error) {
       return (
-        <div className="flex-1 flex items-start p-4 bg-bg-primary">
+        <div className="flex-1 flex items-start p-4 bg-bg-primary overflow-auto">
           <div className="w-full rounded-lg border border-error/20 bg-error-muted p-4 animate-fade-in">
             <div className="text-xs font-semibold text-error mb-2">{t("results.error")}</div>
-            <pre className="text-xs text-text-secondary whitespace-pre-wrap font-mono leading-relaxed">
+            <pre className="text-xs text-text-secondary whitespace-pre-wrap break-words font-mono leading-relaxed select-text">
               {error}
             </pre>
           </div>
@@ -252,10 +252,10 @@ export function ResultsTable() {
       <div className="flex flex-col h-full bg-bg-primary">
         <FilterBar />
         {error ? (
-          <div className="px-4 pt-2">
+          <div className="px-4 pt-2 overflow-auto flex-1">
             <div className="rounded-lg border border-error/20 bg-error-muted p-3 animate-fade-in">
               <div className="text-xs font-semibold text-error mb-1">{t("results.error")}</div>
-              <pre className="text-xs text-text-secondary whitespace-pre-wrap font-mono leading-relaxed">
+              <pre className="text-xs text-text-secondary whitespace-pre-wrap break-words font-mono leading-relaxed select-text">
                 {error}
               </pre>
             </div>
@@ -275,10 +275,10 @@ export function ResultsTable() {
       <ResultsToolbar />
 
       {error ? (
-        <div className="flex-1 flex items-start p-4">
+        <div className="flex-1 flex items-start p-4 overflow-auto">
           <div className="w-full rounded-lg border border-error/20 bg-error-muted p-3 animate-fade-in">
             <div className="text-xs font-semibold text-error mb-1">{t("results.error")}</div>
-            <pre className="text-xs text-text-secondary whitespace-pre-wrap font-mono leading-relaxed">
+            <pre className="text-xs text-text-secondary whitespace-pre-wrap break-words font-mono leading-relaxed select-text">
               {error}
             </pre>
           </div>

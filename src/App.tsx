@@ -29,6 +29,9 @@ function App() {
   const queries = useQueryFileStore((s) => s.queries);
   const loadQueries = useQueryFileStore((s) => s.loadQueries);
 
+  const queryError = useQueryStore((s) => s.error);
+  const clearQueryError = useQueryStore((s) => s.clearError);
+
   const activeConnectionId = useConnectionStore((s) => s.activeConnectionId);
   const loadConnections = useConnectionStore((s) => s.loadConnections);
   const connectionError = useConnectionStore((s) => s.error);
@@ -132,6 +135,15 @@ function App() {
 
       <UpdateChecker />
 
+      {queryError && (
+        <ErrorToast
+          title={t("results.error")}
+          message={queryError}
+          duration={30000}
+          onDismiss={clearQueryError}
+        />
+      )}
+
       {connectionError && (
         <ErrorToast
           message={connectionError}
@@ -178,17 +190,21 @@ function WelcomeScreen({ onConnect }: { onConnect: () => void }) {
   );
 }
 
-function ErrorToast({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+function ErrorToast({ message, onDismiss, title, duration = 8000 }: { message: string; onDismiss: () => void; title?: string; duration?: number }) {
   useEffect(() => {
-    const timer = setTimeout(onDismiss, 8000);
+    if (duration <= 0) return;
+    const timer = setTimeout(onDismiss, duration);
     return () => clearTimeout(timer);
-  }, [message, onDismiss]);
+  }, [message, onDismiss, duration]);
 
   return (
-    <div className="fixed bottom-12 right-4 z-50 max-w-sm animate-fade-in">
+    <div className="fixed bottom-12 right-4 z-50 max-w-lg animate-fade-in">
       <div className="flex items-start gap-2.5 px-4 py-3 rounded-lg bg-bg-elevated border border-error/30 shadow-lg shadow-black/30">
         <AlertCircle size={15} className="text-error shrink-0 mt-0.5" />
-        <p className="text-xs text-text-secondary leading-relaxed flex-1">{message}</p>
+        <div className="flex-1 min-w-0">
+          {title && <div className="text-xs font-semibold text-error mb-1">{title}</div>}
+          <p className="text-xs text-text-secondary leading-relaxed break-words max-h-40 overflow-auto select-text">{message}</p>
+        </div>
         <button
           onClick={onDismiss}
           className="p-0.5 rounded hover:bg-bg-hover text-text-muted hover:text-text-primary transition-colors shrink-0"

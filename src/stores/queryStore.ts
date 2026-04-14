@@ -64,6 +64,7 @@ interface QueryState {
   savePendingChanges: () => Promise<void>;
   discardPendingChanges: () => void;
   resetDataState: () => void;
+  clearError: () => void;
 }
 
 let filterCounter = 1;
@@ -148,6 +149,8 @@ export const useQueryStore = create<QueryState>((set, get) => ({
       selectedRowIndex: null,
       tableContext: null,
     }),
+
+  clearError: () => set({ error: null }),
 
   executeQuery: async (sqlOverride) => {
     const state = get();
