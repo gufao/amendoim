@@ -149,6 +149,17 @@ export const ptBR = {
   "editor.run": "Executar",
   "editor.stop": "Parar",
 
+  // Feedback
+  "feedback.button": "Feedback",
+  "feedback.title": "Envie seu feedback",
+  "feedback.placeholder": "O que poderia ser melhor?",
+  "feedback.hint": "Cmd+Enter para enviar",
+  "feedback.send": "Enviar",
+  "feedback.thanks": "Obrigado pelo feedback!",
+
+  // Connection Tabs
+  "tabs.closeTab": "Fechar conexao",
+
   // Query files
   "query.untitled": "SQL Query {n}",
   "query.delete": "Excluir query",

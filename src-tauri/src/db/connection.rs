@@ -75,8 +75,21 @@ impl ConnectionManager {
         self.active_id.as_deref()
     }
 
+    pub fn set_active(&mut self, id: &str) -> Result<(), String> {
+        if self.pools.contains_key(id) {
+            self.active_id = Some(id.to_string());
+            Ok(())
+        } else {
+            Err("Connection not found or not connected".into())
+        }
+    }
+
     pub fn is_connected(&self, id: &str) -> bool {
         self.pools.contains_key(id)
+    }
+
+    pub fn connected_ids(&self) -> Vec<String> {
+        self.pools.keys().cloned().collect()
     }
 }
 

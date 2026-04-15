@@ -3,6 +3,7 @@ import { AlertCircle, X } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { Sidebar } from "./components/layout/Sidebar";
 import { StatusBar } from "./components/layout/StatusBar";
+import { ConnectionTabs } from "./components/layout/ConnectionTabs";
 import { SqlEditor } from "./components/editor/SqlEditor";
 import { ResultsTable } from "./components/results/ResultsTable";
 import { useQueryStore } from "./stores/queryStore";
@@ -54,7 +55,7 @@ function App() {
       "mcp-execute-query",
       (event) => {
         const { sql, title } = event.payload;
-        const query = addQuery(title, sql);
+        const query = addQuery(activeConnectionId, title, sql);
         setActiveQueryId(query.id);
         setSql(sql);
         executeQuery();
@@ -70,7 +71,7 @@ function App() {
       const meta = e.metaKey || e.ctrlKey;
       if (meta && e.key === "n") {
         e.preventDefault();
-        const query = addQuery();
+        const query = addQuery(activeConnectionId);
         setActiveQueryId(query.id);
         setSql(query.sql);
         setActiveView("editor");
@@ -101,6 +102,7 @@ function App() {
 
   return (
     <div className="h-full flex flex-col bg-bg-primary">
+      <ConnectionTabs onNewConnection={() => setShowConnectionModal(true)} />
       <div className="flex-1 flex min-h-0">
         <Sidebar
           onNewConnection={() => setShowConnectionModal(true)}

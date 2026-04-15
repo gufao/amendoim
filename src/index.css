@@ -110,6 +110,16 @@
   to { opacity: 1; transform: translateX(0); }
 }
 
+@keyframes popoverIn {
+  from { opacity: 0; transform: translateY(6px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes popoverOut {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(6px) scale(0.96); }
+}
+
 @layer utilities {
   .animate-fade-in {
     animation: fadeIn 0.2s ease-out;
@@ -117,6 +127,14 @@
 
   .animate-slide-in {
     animation: slideIn 0.15s ease-out;
+  }
+
+  .animate-popover-in {
+    animation: popoverIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .animate-popover-out {
+    animation: popoverOut 0.15s ease-in forwards;
   }
 }
 

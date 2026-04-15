@@ -5,6 +5,7 @@ export interface QueryFile {
   id: string;
   title: string;
   sql: string;
+  connectionId: string | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -14,11 +15,12 @@ let queryCounter = 0;
 interface QueryFileState {
   queries: QueryFile[];
   loadQueries: () => void;
-  addQuery: (title?: string, sql?: string) => QueryFile;
+  addQuery: (connectionId: string | null, title?: string, sql?: string) => QueryFile;
   removeQuery: (id: string) => void;
   updateQuery: (id: string, updates: Partial<Pick<QueryFile, "sql" | "title">>) => void;
   renameQuery: (id: string, title: string) => void;
   getNextTitle: () => string;
+  getQueriesForConnection: (connectionId: string | null) => QueryFile[];
 }
 
 export const useQueryFileStore = create<QueryFileState>()(
@@ -41,12 +43,13 @@ export const useQueryFileStore = create<QueryFileState>()(
         return `SQL Query ${queryCounter}`;
       },
 
-      addQuery: (title, sql) => {
+      addQuery: (connectionId, title, sql) => {
         const now = Date.now();
         const query: QueryFile = {
           id: `query-${now}-${Math.random().toString(36).slice(2, 8)}`,
           title: title || get().getNextTitle(),
           sql: sql || "",
+          connectionId,
           createdAt: now,
           updatedAt: now,
         };
@@ -72,6 +75,12 @@ export const useQueryFileStore = create<QueryFileState>()(
             q.id === id ? { ...q, title, updatedAt: Date.now() } : q
           ),
         }));
+      },
+
+      getQueriesForConnection: (connectionId) => {
+        return get().queries.filter(
+          (q) => q.connectionId === connectionId || q.connectionId === null
+        );
       },
     }),
     { name: "amendoim-queries" }

@@ -148,10 +148,27 @@ pub async fn get_active_connection(
 }
 
 #[tauri::command]
+pub async fn set_active_connection(
+    state: State<'_, SharedConnectionManager>,
+    id: String,
+) -> Result<(), String> {
+    let mut manager = state.lock().await;
+    manager.set_active(&id)
+}
+
+#[tauri::command]
 pub async fn is_connected(
     state: State<'_, SharedConnectionManager>,
     id: String,
 ) -> Result<bool, String> {
     let manager = state.lock().await;
     Ok(manager.is_connected(&id))
+}
+
+#[tauri::command]
+pub async fn get_connected_ids(
+    state: State<'_, SharedConnectionManager>,
+) -> Result<Vec<String>, String> {
+    let manager = state.lock().await;
+    Ok(manager.connected_ids())
 }

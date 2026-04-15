@@ -151,6 +151,17 @@ export const en: Record<TranslationKey, string> = {
   "editor.run": "Run",
   "editor.stop": "Stop",
 
+  // Feedback
+  "feedback.button": "Feedback",
+  "feedback.title": "Send your feedback",
+  "feedback.placeholder": "What could be better?",
+  "feedback.hint": "Cmd+Enter to send",
+  "feedback.send": "Send",
+  "feedback.thanks": "Thanks for your feedback!",
+
+  // Connection Tabs
+  "tabs.closeTab": "Close connection",
+
   // Query files
   "query.untitled": "SQL Query {n}",
   "query.delete": "Delete query",

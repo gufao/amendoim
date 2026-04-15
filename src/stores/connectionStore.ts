@@ -6,6 +6,7 @@ import { trackEvent } from "../lib/analytics";
 interface ConnectionState {
   connections: ConnectionConfig[];
   activeConnectionId: string | null;
+  connectedIds: string[];
   isConnecting: boolean;
   error: string | null;
 
@@ -15,12 +16,15 @@ interface ConnectionState {
   testConnection: (config: ConnectionConfig) => Promise<void>;
   connect: (id: string) => Promise<void>;
   disconnect: (id: string) => Promise<void>;
+  switchConnection: (id: string) => Promise<void>;
+  closeTab: (id: string) => Promise<void>;
   setError: (error: string | null) => void;
 }
 
 export const useConnectionStore = create<ConnectionState>((set, get) => ({
   connections: [],
   activeConnectionId: null,
+  connectedIds: [],
   isConnecting: false,
   error: null,
 
@@ -28,7 +32,8 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
     try {
       const connections = await api.listConnections();
       const activeId = await api.getActiveConnection();
-      set({ connections, activeConnectionId: activeId });
+      const connectedIds = await api.getConnectedIds();
+      set({ connections, activeConnectionId: activeId, connectedIds });
     } catch (e) {
       set({ error: String(e) });
     }
@@ -49,8 +54,16 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
   deleteConnection: async (id) => {
     try {
       await api.deleteConnection(id);
-      if (get().activeConnectionId === id) {
-        set({ activeConnectionId: null });
+      const state = get();
+      const newConnected = state.connectedIds.filter((cid) => cid !== id);
+      if (state.activeConnectionId === id) {
+        const next = newConnected[0] || null;
+        if (next) {
+          await api.setActiveConnection(next);
+        }
+        set({ activeConnectionId: next, connectedIds: newConnected });
+      } else {
+        set({ connectedIds: newConnected });
       }
       await get().loadConnections();
     } catch (e) {
@@ -75,7 +88,9 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
     set({ isConnecting: true, error: null });
     try {
       await api.connect(id);
-      set({ activeConnectionId: id });
+      const connected = get().connectedIds;
+      const newConnected = connected.includes(id) ? connected : [...connected, id];
+      set({ activeConnectionId: id, connectedIds: newConnected });
       trackEvent("connection_established");
     } catch (e) {
       const msg = String(e);
@@ -89,8 +104,42 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
   disconnect: async (id) => {
     try {
       await api.disconnect(id);
-      if (get().activeConnectionId === id) {
-        set({ activeConnectionId: null });
+      const state = get();
+      const newConnected = state.connectedIds.filter((cid) => cid !== id);
+      if (state.activeConnectionId === id) {
+        set({ activeConnectionId: null, connectedIds: newConnected });
+      } else {
+        set({ connectedIds: newConnected });
+      }
+    } catch (e) {
+      set({ error: String(e) });
+    }
+  },
+
+  switchConnection: async (id) => {
+    const state = get();
+    if (state.activeConnectionId === id) return;
+    try {
+      await api.setActiveConnection(id);
+      set({ activeConnectionId: id });
+    } catch (e) {
+      set({ error: String(e) });
+    }
+  },
+
+  closeTab: async (id) => {
+    const state = get();
+    const newConnected = state.connectedIds.filter((cid) => cid !== id);
+    try {
+      await api.disconnect(id);
+      if (state.activeConnectionId === id) {
+        const next = newConnected[0] || null;
+        if (next) {
+          await api.setActiveConnection(next);
+        }
+        set({ activeConnectionId: next, connectedIds: newConnected });
+      } else {
+        set({ connectedIds: newConnected });
       }
     } catch (e) {
       set({ error: String(e) });

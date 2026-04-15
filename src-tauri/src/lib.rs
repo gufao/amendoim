@@ -75,6 +75,8 @@ pub fn run() {
             commands::connection::list_connections,
             commands::connection::get_active_connection,
             commands::connection::is_connected,
+            commands::connection::set_active_connection,
+            commands::connection::get_connected_ids,
             // Schema commands
             commands::schema::list_schemas,
             commands::schema::list_tables,

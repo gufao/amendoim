@@ -78,6 +78,12 @@ export const getActiveConnection = () =>
 export const isConnected = (id: string) =>
   invoke<boolean>("is_connected", { id });
 
+export const setActiveConnection = (id: string) =>
+  invoke<void>("set_active_connection", { id });
+
+export const getConnectedIds = () =>
+  invoke<string[]>("get_connected_ids");
+
 // Schema commands
 export const listSchemas = () =>
   invoke<SchemaInfo[]>("list_schemas");

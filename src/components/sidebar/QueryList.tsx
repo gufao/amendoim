@@ -2,11 +2,16 @@ import { useState, useRef, useEffect } from "react";
 import { FileCode2, Plus, X, Check } from "lucide-react";
 import { useQueryFileStore } from "../../stores/queryFileStore";
 import { useQueryStore } from "../../stores/queryStore";
+import { useConnectionStore } from "../../stores/connectionStore";
 import { useT } from "../../i18n";
 
 export function QueryList() {
   const t = useT();
-  const queries = useQueryFileStore((s) => s.queries);
+  const activeConnectionId = useConnectionStore((s) => s.activeConnectionId);
+  const allQueries = useQueryFileStore((s) => s.queries);
+  const queries = allQueries.filter(
+    (q) => q.connectionId === activeConnectionId || q.connectionId === null
+  );
   const addQuery = useQueryFileStore((s) => s.addQuery);
   const removeQuery = useQueryFileStore((s) => s.removeQuery);
   const renameQuery = useQueryFileStore((s) => s.renameQuery);
@@ -43,7 +48,7 @@ export function QueryList() {
   };
 
   const handleAddQuery = () => {
-    const query = addQuery();
+    const query = addQuery(activeConnectionId);
     handleSelectQuery(query);
   };
 

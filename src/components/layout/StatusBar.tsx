@@ -4,6 +4,7 @@ import { useMcpStore } from "../../stores/mcpStore";
 import { useStatusQuery } from "../../hooks/useQuery";
 import { formatDuration, formatRowCount } from "../../lib/format";
 import { useT, useI18nStore, type Locale } from "../../i18n";
+import { FeedbackButton } from "./FeedbackPopover";
 
 export function StatusBar({
   onOpenMcp,
@@ -91,6 +92,9 @@ export function StatusBar({
           <span className="w-1 h-1 rounded-full bg-success" />
         )}
       </button>
+
+      {/* Feedback */}
+      <FeedbackButton />
 
       {/* Language switcher */}
       <LanguageSwitcher />
