@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState, Component, type ReactNode, type ErrorInfo } from "react";
+import { useEffect, useCallback, useState, useRef, Component, type ReactNode, type ErrorInfo } from "react";
 import { AlertCircle, X } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { Sidebar } from "./components/layout/Sidebar";
@@ -17,13 +17,14 @@ import { useT } from "./i18n";
 import { trackEvent } from "./lib/analytics";
 
 function App() {
-  const activeView = useQueryStore((s) => s.activeView);
   const activeQueryId = useQueryStore((s) => s.activeQueryId);
   const setActiveQueryId = useQueryStore((s) => s.setActiveQueryId);
-  const setActiveView = useQueryStore((s) => s.setActiveView);
   const setSql = useQueryStore((s) => s.setSql);
   const resetDataState = useQueryStore((s) => s.resetDataState);
   const executeQuery = useQueryStore((s) => s.executeQuery);
+  const result = useQueryStore((s) => s.result);
+  const isExecuting = useQueryStore((s) => s.isExecuting);
+  const tableContext = useQueryStore((s) => s.tableContext);
 
   const addQuery = useQueryFileStore((s) => s.addQuery);
   const removeQuery = useQueryFileStore((s) => s.removeQuery);
@@ -41,6 +42,40 @@ function App() {
   const [showConnectionModal, setShowConnectionModal] = useState(false);
   const [showMcpModal, setShowMcpModal] = useState(false);
   const [editingConnection, setEditingConnection] = useState<ConnectionConfig | null>(null);
+
+  // Split pane state
+  const [splitRatio, setSplitRatio] = useState(0.4);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isDragging = useRef(false);
+
+  // Split pane only for editor queries; table preview takes full screen
+  const isTablePreview = tableContext !== null;
+  const hasQueryResults = (result !== null || isExecuting) && !isTablePreview;
+
+  const handleDragStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isDragging.current = true;
+
+    const onMouseMove = (ev: MouseEvent) => {
+      if (!isDragging.current || !containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const ratio = (ev.clientY - rect.top) / rect.height;
+      setSplitRatio(Math.max(0.15, Math.min(0.85, ratio)));
+    };
+
+    const onMouseUp = () => {
+      isDragging.current = false;
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+
+    document.body.style.cursor = "row-resize";
+    document.body.style.userSelect = "none";
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  }, []);
 
   const t = useT();
 
@@ -74,7 +109,6 @@ function App() {
         const query = addQuery(activeConnectionId);
         setActiveQueryId(query.id);
         setSql(query.sql);
-        setActiveView("editor");
         resetDataState();
       }
       if (meta && e.key === "w") {
@@ -92,7 +126,7 @@ function App() {
         }
       }
     },
-    [activeQueryId, addQuery, removeQuery, queries, setActiveQueryId, setSql, setActiveView, resetDataState, t]
+    [activeQueryId, addQuery, removeQuery, queries, setActiveQueryId, setSql, resetDataState, t]
   );
 
   useEffect(() => {
@@ -109,13 +143,28 @@ function App() {
           onEditConnection={(config) => setEditingConnection(config)}
         />
 
-        <div className="flex-1 flex flex-col min-w-0">
+        <div ref={containerRef} className="flex-1 flex flex-col min-w-0">
           {!activeConnectionId ? (
             <WelcomeScreen onConnect={() => setShowConnectionModal(true)} />
-          ) : activeView === "editor" ? (
-            <SqlEditor />
-          ) : (
+          ) : isTablePreview ? (
             <ErrorBoundary><ResultsTable /></ErrorBoundary>
+          ) : (
+            <>
+              <div className={hasQueryResults ? "min-h-0 flex flex-col" : "flex-1 min-h-0 flex flex-col"} style={hasQueryResults ? { height: `${splitRatio * 100}%` } : undefined}>
+                <SqlEditor />
+              </div>
+              {hasQueryResults && (
+                <>
+                  <div
+                    className="h-1 shrink-0 cursor-row-resize bg-border hover:bg-accent/60 transition-colors"
+                    onMouseDown={handleDragStart}
+                  />
+                  <div className="flex-1 min-h-0 flex flex-col">
+                    <ErrorBoundary><ResultsTable /></ErrorBoundary>
+                  </div>
+                </>
+              )}
+            </>
           )}
         </div>
       </div>

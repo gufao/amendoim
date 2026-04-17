@@ -67,6 +67,8 @@ export const en: Record<TranslationKey, string> = {
   "results.empty": "Results will appear here",
   "results.noRows": "Query returned no rows",
   "results.rowsAffected": "{count} rows affected",
+  "results.queryExecuted": "Query executed successfully",
+  "results.executionTime": "{time}ms",
   "results.exportCsv": "Export CSV",
   "results.rows": "Rows:",
   "results.null": "NULL",

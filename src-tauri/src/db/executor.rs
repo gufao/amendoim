@@ -119,10 +119,22 @@ async fn execute_query_inner(
             affected_rows: None,
         })
     } else {
-        let result = sqlx::query(&final_sql)
-            .execute(&mut *conn)
-            .await
-            .map_err(|e| format!("Query error: {}", e))?;
+        // Split multiple statements by semicolons so each can be executed
+        // individually (prepared statements only support one command at a time).
+        let statements: Vec<&str> = final_sql
+            .split(';')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .collect();
+
+        let mut total_affected = 0u64;
+        for stmt in &statements {
+            let result = sqlx::query(stmt)
+                .execute(&mut *conn)
+                .await
+                .map_err(|e| format!("Query error: {}", e))?;
+            total_affected += result.rows_affected();
+        }
 
         let execution_time_ms = start.elapsed().as_millis();
 
@@ -132,7 +144,7 @@ async fn execute_query_inner(
             row_count: 0,
             total_rows: None,
             execution_time_ms,
-            affected_rows: Some(result.rows_affected()),
+            affected_rows: Some(total_affected),
         })
     }
 }

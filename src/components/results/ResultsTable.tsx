@@ -218,11 +218,18 @@ export function ResultsTable() {
   if (result.affected_rows !== null) {
     return (
       <div className="flex-1 flex items-center justify-center bg-bg-primary">
-        <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-success-muted text-success text-xs font-medium animate-fade-in">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-          {t("results.rowsAffected", { count: result.affected_rows })}
+        <div className="flex flex-col items-center gap-2 animate-fade-in">
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-success-muted text-success text-xs font-medium">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+            {t("results.queryExecuted")}
+          </div>
+          <div className="flex items-center gap-3 text-[11px] text-text-muted">
+            <span>{t("results.rowsAffected", { count: result.affected_rows })}</span>
+            <span className="text-text-faint">·</span>
+            <span>{t("results.executionTime", { time: result.execution_time_ms })}</span>
+          </div>
         </div>
       </div>
     );

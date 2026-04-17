@@ -65,6 +65,8 @@ export const ptBR = {
   "results.empty": "Os resultados aparecerão aqui",
   "results.noRows": "A query não retornou linhas",
   "results.rowsAffected": "{count} linhas afetadas",
+  "results.queryExecuted": "Comando executado com sucesso",
+  "results.executionTime": "{time}ms",
   "results.exportCsv": "Exportar CSV",
   "results.rows": "Linhas:",
   "results.null": "NULO",
