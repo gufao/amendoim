@@ -115,6 +115,7 @@ async fn execute_query_inner(
             rows: result_rows,
             row_count,
             total_rows: None,
+            total_rows_estimated: false,
             execution_time_ms,
             affected_rows: None,
         })
@@ -143,6 +144,7 @@ async fn execute_query_inner(
             rows: Vec::new(),
             row_count: 0,
             total_rows: None,
+            total_rows_estimated: false,
             execution_time_ms,
             affected_rows: Some(total_affected),
         })

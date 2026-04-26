@@ -58,7 +58,10 @@ export function StatusBar({
               <Rows3 size={10} />
               <span>
                 {result.total_rows !== null && result.total_rows !== undefined
-                  ? t("status.rowsOfTotal", { count: formatRowCount(result.row_count), total: formatRowCount(result.total_rows) })
+                  ? t(result.total_rows_estimated ? "status.rowsOfTotalEst" : "status.rowsOfTotal", {
+                      count: formatRowCount(result.row_count),
+                      total: formatRowCount(result.total_rows),
+                    })
                   : t("status.rows", { count: formatRowCount(result.row_count) })}
               </span>
             </div>

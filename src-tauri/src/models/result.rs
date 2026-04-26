@@ -7,6 +7,7 @@ pub struct QueryResult {
     pub rows: Vec<HashMap<String, serde_json::Value>>,
     pub row_count: usize,
     pub total_rows: Option<i64>,
+    pub total_rows_estimated: bool,
     pub execution_time_ms: u128,
     pub affected_rows: Option<u64>,
 }

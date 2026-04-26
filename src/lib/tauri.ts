@@ -49,6 +49,7 @@ export interface QueryResult {
   rows: Record<string, unknown>[];
   row_count: number;
   total_rows: number | null;
+  total_rows_estimated: boolean;
   execution_time_ms: number;
   affected_rows: number | null;
 }
@@ -101,8 +102,8 @@ export const listIndexes = (schema: string, table: string) =>
 export const executeQuery = (sql: string, limit?: number, offset?: number) =>
   invoke<QueryResult>("execute_query", { sql, limit, offset });
 
-export const previewTable = (schema: string, table: string) =>
-  invoke<QueryResult>("preview_table", { schema, table });
+export const previewTable = (schema: string, table: string, limit?: number, offset?: number) =>
+  invoke<QueryResult>("preview_table", { schema, table, limit, offset });
 
 export const exportCsv = (sql: string) =>
   invoke<string>("export_csv", { sql });

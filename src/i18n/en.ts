@@ -76,6 +76,7 @@ export const en: Record<TranslationKey, string> = {
   // Status Bar
   "status.rows": "{count} rows",
   "status.rowsOfTotal": "{count} rows of {total} total",
+  "status.rowsOfTotalEst": "{count} rows of ~{total} total (estimated)",
   "status.affected": "{count} affected",
 
   // Filter Bar

@@ -29,6 +29,8 @@ pub async fn preview_table(
     pids: State<'_, ActiveQueryPids>,
     schema: String,
     table: String,
+    limit: Option<i64>,
+    offset: Option<i64>,
 ) -> Result<QueryResult, String> {
     let (pool, connection_id) = {
         let manager = state.lock().await;
@@ -37,18 +39,26 @@ pub async fn preview_table(
         (pool, connection_id)
     };
 
-    // Get total count
-    let count_sql = format!("SELECT count(*) as total FROM \"{}\".\"{}\"", schema, table);
-    let count_row = sqlx::query(&count_sql)
-        .fetch_one(&pool)
+    // Estimate total via pg_class.reltuples (instant, no full scan).
+    // Falls back to None if the table was never analyzed (reltuples < 0).
+    let estimate_sql = "SELECT c.reltuples::bigint AS total \
+                        FROM pg_class c \
+                        JOIN pg_namespace n ON n.oid = c.relnamespace \
+                        WHERE n.nspname = $1 AND c.relname = $2";
+    let estimate: Option<i64> = sqlx::query(estimate_sql)
+        .bind(&schema)
+        .bind(&table)
+        .fetch_optional(&pool)
         .await
-        .map_err(|e| format!("Count error: {}", e))?;
-    let total: i64 = count_row.try_get("total").unwrap_or(0);
+        .map_err(|e| format!("Estimate error: {}", e))?
+        .and_then(|row| row.try_get::<i64, _>("total").ok())
+        .filter(|n| *n >= 0);
 
-    // Get data
-    let select_sql = format!("SELECT * FROM \"{}\".\"{}\" LIMIT 1000", schema, table);
-    let mut result = executor::execute_query(&pool, &select_sql, None, None, &pids, &connection_id).await?;
-    result.total_rows = Some(total);
+    let select_sql = format!("SELECT * FROM \"{}\".\"{}\"", schema, table);
+    let effective_limit = limit.or(Some(100));
+    let mut result = executor::execute_query(&pool, &select_sql, effective_limit, offset, &pids, &connection_id).await?;
+    result.total_rows = estimate;
+    result.total_rows_estimated = estimate.is_some();
 
     Ok(result)
 }

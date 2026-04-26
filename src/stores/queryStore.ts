@@ -54,6 +54,7 @@ interface QueryState {
   executeQuery: (sqlOverride?: string) => Promise<void>;
   cancelQuery: () => Promise<void>;
   previewTable: (schema: string, table: string) => Promise<void>;
+  fetchPreviewPage: () => Promise<void>;
   addFilter: () => void;
   updateFilter: (filterId: string, updates: Partial<Filter>) => void;
   removeFilter: (filterId: string) => void;
@@ -186,6 +187,7 @@ export const useQueryStore = create<QueryState>((set, get) => ({
   },
 
   previewTable: async (schema, table) => {
+    const { pageSize } = get();
     set({
       isExecuting: true,
       error: null,
@@ -195,11 +197,30 @@ export const useQueryStore = create<QueryState>((set, get) => ({
       pendingChanges: {},
       selectedRowIndex: null,
       page: 0,
-      sql: `SELECT * FROM "${schema}"."${table}" LIMIT 1000`,
+      sql: `SELECT * FROM "${schema}"."${table}" LIMIT ${pageSize}`,
     });
 
     try {
-      const result = await api.previewTable(schema, table);
+      const result = await api.previewTable(schema, table, pageSize, 0);
+      set({ result, isExecuting: false });
+    } catch (e) {
+      set({ error: String(e), isExecuting: false });
+    }
+  },
+
+  fetchPreviewPage: async () => {
+    const state = get();
+    if (!state.tableContext) return;
+    const { schema, table } = state.tableContext;
+    const offset = state.page * state.pageSize;
+    set({
+      isExecuting: true,
+      error: null,
+      selectedRowIndex: null,
+      sql: `SELECT * FROM "${schema}"."${table}" LIMIT ${state.pageSize} OFFSET ${offset}`,
+    });
+    try {
+      const result = await api.previewTable(schema, table, state.pageSize, offset);
       set({ result, isExecuting: false });
     } catch (e) {
       set({ error: String(e), isExecuting: false });
@@ -231,23 +252,27 @@ export const useQueryStore = create<QueryState>((set, get) => ({
     const state = get();
     if (!state.tableContext) return;
 
+    const activeFilters = state.filters.filter((f) => f.enabled && (f.column === ANY_COLUMN_VALUE || f.column));
+    if (activeFilters.length === 0) {
+      // No filters → fall back to the preview path (uses pg_class estimate, no full count).
+      await get().fetchPreviewPage();
+      return;
+    }
+
     const { schema, table } = state.tableContext;
     const allColumns = state.result?.columns.map((c) => c.name) || [];
-    const sql = buildFilteredSql(schema, table, state.filters, 1000, allColumns);
+    const sql = buildFilteredSql(schema, table, state.filters, state.pageSize, allColumns);
 
     set({ sql, isExecuting: true, error: null, selectedRowIndex: null });
 
     try {
       const result = await api.executeQuery(sql, undefined, undefined);
-      const activeFilters = state.filters.filter((f) => f.enabled && (f.column === ANY_COLUMN_VALUE || f.column));
-      let countSql = `SELECT count(*) as total FROM "${schema}"."${table}"`;
-      if (activeFilters.length > 0) {
-        const clauses = activeFilters.map((f) => buildFilterClause(f, allColumns));
-        countSql += ` WHERE ${clauses.join(" AND ")}`;
-      }
+      const clauses = activeFilters.map((f) => buildFilterClause(f, allColumns));
+      const countSql = `SELECT count(*) as total FROM "${schema}"."${table}" WHERE ${clauses.join(" AND ")}`;
       const countResult = await api.executeQuery(countSql, undefined, undefined);
       const total = countResult.rows[0]?.["total"];
       result.total_rows = typeof total === "number" ? total : null;
+      result.total_rows_estimated = false;
 
       set({ result, isExecuting: false });
     } catch (e) {
@@ -257,12 +282,24 @@ export const useQueryStore = create<QueryState>((set, get) => ({
 
   setPage: (page) => {
     set({ page, selectedRowIndex: null });
-    get().executeQuery();
+    const state = get();
+    const hasActiveFilters = state.filters.some((f) => f.enabled && (f.column === ANY_COLUMN_VALUE || f.column));
+    if (state.tableContext && !hasActiveFilters) {
+      get().fetchPreviewPage();
+    } else {
+      get().executeQuery();
+    }
   },
 
   setPageSize: (pageSize) => {
     set({ pageSize, page: 0, selectedRowIndex: null });
-    get().executeQuery();
+    const state = get();
+    const hasActiveFilters = state.filters.some((f) => f.enabled && (f.column === ANY_COLUMN_VALUE || f.column));
+    if (state.tableContext && !hasActiveFilters) {
+      get().fetchPreviewPage();
+    } else {
+      get().executeQuery();
+    }
   },
 
   updateCellValue: (rowIndex, column, value) => {

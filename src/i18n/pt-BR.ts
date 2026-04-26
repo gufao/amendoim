@@ -74,6 +74,7 @@ export const ptBR = {
   // Status Bar
   "status.rows": "{count} linhas",
   "status.rowsOfTotal": "{count} linhas de {total} total",
+  "status.rowsOfTotalEst": "{count} linhas de ~{total} total (estimado)",
   "status.affected": "{count} afetadas",
 
   // Filter Bar
