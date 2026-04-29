@@ -70,6 +70,7 @@ pub async fn export_csv(
     sql: String,
     limit: Option<i64>,
     offset: Option<i64>,
+    include_header: Option<bool>,
 ) -> Result<String, String> {
     let (pool, connection_id) = {
         let manager = state.lock().await;
@@ -84,11 +85,12 @@ pub async fn export_csv(
     }
 
     let mut csv = String::new();
-
-    // Header
     let headers: Vec<&str> = result.columns.iter().map(|c| c.name.as_str()).collect();
-    csv.push_str(&headers.join(","));
-    csv.push('\n');
+
+    if include_header.unwrap_or(true) {
+        csv.push_str(&headers.join(","));
+        csv.push('\n');
+    }
 
     // Rows
     for row in &result.rows {

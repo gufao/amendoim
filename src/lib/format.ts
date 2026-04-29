@@ -28,3 +28,42 @@ export function truncate(str: string, maxLength: number = 50): string {
   if (str.length <= maxLength) return str;
   return str.substring(0, maxLength) + "...";
 }
+
+export function toSqlLiteral(value: unknown): string {
+  if (value === null || value === undefined) return "NULL";
+  if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
+  if (typeof value === "number") return Number.isFinite(value) ? String(value) : "NULL";
+  if (typeof value === "bigint") return value.toString();
+  if (typeof value === "object") {
+    const json = JSON.stringify(value);
+    return `'${json.replace(/'/g, "''")}'`;
+  }
+  return `'${String(value).replace(/'/g, "''")}'`;
+}
+
+export function generateInsertStatements(
+  rows: Record<string, unknown>[],
+  columns: { name: string }[],
+  schema: string,
+  table: string,
+): string {
+  if (!rows.length || !columns.length) return "";
+  const colNames = columns.map((c) => `"${c.name}"`).join(", ");
+  const target = schema ? `"${schema}"."${table}"` : `"${table}"`;
+  return rows
+    .map((row) => {
+      const values = columns.map((c) => toSqlLiteral(row[c.name])).join(", ");
+      return `INSERT INTO ${target} (${colNames}) VALUES (${values});`;
+    })
+    .join("\n");
+}
+
+/** Best-effort target table inference from a SQL string. */
+export function inferTableFromSql(sql: string): { schema: string; table: string } | null {
+  const m = sql.match(/\bFROM\s+("?[\w$]+"?)(?:\.("?[\w$]+"?))?/i);
+  if (!m) return null;
+  const strip = (s: string) => s.replace(/^"|"$/g, "");
+  const a = strip(m[1]);
+  const b = m[2] ? strip(m[2]) : null;
+  return b ? { schema: a, table: b } : { schema: "", table: a };
+}

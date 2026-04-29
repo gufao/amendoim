@@ -77,6 +77,15 @@ export const en: Record<TranslationKey, string> = {
   "export.allRows": "All rows",
   "export.allRowsHint": "May take a while on large tables",
   "export.exporting": "Exporting...",
+  "export.includeHeader": "Include header",
+
+  // Insert generator
+  "insert.button": "Copy as INSERT",
+  "insert.title": "Generate INSERT",
+  "insert.targetTable": "Target table",
+  "insert.copyCurrentPage": "Copy current page ({count})",
+  "insert.copyAll": "Copy all rows",
+  "insert.copied": "Copied!",
 
   // Status Bar
   "status.rows": "{count} rows",

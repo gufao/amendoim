@@ -6,10 +6,14 @@ import {
   Loader2,
   Save,
   Undo2,
+  ClipboardList,
+  Copy,
+  Check,
 } from "lucide-react";
-import { useToolbarQuery } from "../../hooks/useQuery";
+import { useToolbarQuery, useResultsQuery } from "../../hooks/useQuery";
 import { useT } from "../../i18n";
-import { exportCsv } from "../../lib/tauri";
+import { exportCsv, executeQuery as runQuery } from "../../lib/tauri";
+import { generateInsertStatements, inferTableFromSql } from "../../lib/format";
 
 function stripPaginationClauses(sql: string): string {
   // Strip trailing LIMIT/OFFSET (in either order) and trailing semicolons.
@@ -36,12 +40,25 @@ export function ResultsToolbar() {
     savePendingChanges,
     discardPendingChanges,
   } = useToolbarQuery();
+  const { tableContext } = useResultsQuery();
   const t = useT();
   const [exporting, setExporting] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [includeHeader, setIncludeHeader] = useState(true);
+
+  const [insertMenuOpen, setInsertMenuOpen] = useState(false);
+  const [insertTarget, setInsertTarget] = useState<{ schema: string; table: string }>({
+    schema: "",
+    table: "",
+  });
+  const [insertWorking, setInsertWorking] = useState(false);
+  const [insertCopied, setInsertCopied] = useState<"page" | "all" | null>(null);
+  const [insertError, setInsertError] = useState<string | null>(null);
+
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const exportRef = useRef<HTMLDivElement>(null);
+  const insertRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!exportMenuOpen) return;
@@ -61,6 +78,37 @@ export function ResultsToolbar() {
     };
   }, [exportMenuOpen]);
 
+  useEffect(() => {
+    if (!insertMenuOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (insertRef.current && !insertRef.current.contains(e.target as Node)) {
+        setInsertMenuOpen(false);
+      }
+    };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setInsertMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [insertMenuOpen]);
+
+  // When the menu opens, prefill the target table from context or SQL.
+  useEffect(() => {
+    if (!insertMenuOpen) return;
+    if (tableContext) {
+      setInsertTarget({ schema: tableContext.schema, table: tableContext.table });
+      return;
+    }
+    const inferred = inferTableFromSql(sql);
+    if (inferred) {
+      setInsertTarget(inferred);
+    }
+  }, [insertMenuOpen, tableContext, sql]);
+
   if (!result) return null;
 
   const hasMore = result.row_count >= pageSize;
@@ -78,7 +126,7 @@ export function ResultsToolbar() {
       const sqlToRun = scope === "all" ? stripPaginationClauses(sql) : sql;
       const limit = scope === "page" ? pageSize : undefined;
       const offset = scope === "page" ? page * pageSize : undefined;
-      const csv = await exportCsv(sqlToRun, limit, offset);
+      const csv = await exportCsv(sqlToRun, limit, offset, includeHeader);
       const blob = new Blob([csv], { type: "text/csv" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -90,6 +138,34 @@ export function ResultsToolbar() {
       // Error handling
     } finally {
       setExporting(false);
+    }
+  };
+
+  const copyInserts = async (scope: "page" | "all") => {
+    if (!result || !sql.trim()) return;
+    setInsertError(null);
+    setInsertWorking(true);
+    try {
+      const cols = result.columns;
+      let rows = result.rows;
+      if (scope === "all") {
+        const sqlToRun = stripPaginationClauses(sql);
+        const fetched = await runQuery(sqlToRun, undefined, undefined);
+        rows = fetched.rows;
+      }
+      const text = generateInsertStatements(
+        rows,
+        cols,
+        insertTarget.schema,
+        insertTarget.table || "<table>"
+      );
+      await navigator.clipboard.writeText(text);
+      setInsertCopied(scope);
+      setTimeout(() => setInsertCopied(null), 1800);
+    } catch (e) {
+      setInsertError(String(e));
+    } finally {
+      setInsertWorking(false);
     }
   };
 
@@ -133,10 +209,20 @@ export function ResultsToolbar() {
           </button>
 
           {exportMenuOpen && (
-            <div className="absolute top-full left-0 mt-1 w-56 rounded-lg bg-bg-elevated border border-border shadow-xl shadow-black/40 z-20 animate-popover-in">
+            <div className="absolute top-full left-0 mt-1 w-60 rounded-lg bg-bg-elevated border border-border shadow-xl shadow-black/40 z-20 animate-popover-in">
               <div className="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wide text-text-faint">
                 {t("export.title")}
               </div>
+              <label className="flex items-center gap-2 px-3 py-1.5 text-[11px] text-text-secondary cursor-pointer hover:bg-bg-hover transition-colors">
+                <input
+                  type="checkbox"
+                  checked={includeHeader}
+                  onChange={(e) => setIncludeHeader(e.target.checked)}
+                  className="accent-accent"
+                />
+                {t("export.includeHeader")}
+              </label>
+              <div className="border-t border-border" />
               <button
                 onClick={() => runExport("page")}
                 className="w-full flex items-center gap-2 px-3 py-2 text-[11px] text-text-secondary hover:bg-bg-hover transition-colors text-left"
@@ -156,6 +242,96 @@ export function ResultsToolbar() {
                   {t("export.allRowsHint")}
                 </span>
               </button>
+            </div>
+          )}
+        </div>
+
+        <div className="relative" ref={insertRef}>
+          <button
+            onClick={() => !insertWorking && setInsertMenuOpen((v) => !v)}
+            disabled={insertWorking}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-text-muted hover:bg-bg-hover hover:text-text-secondary transition-colors"
+          >
+            {insertWorking ? (
+              <Loader2 size={11} className="animate-spin" />
+            ) : (
+              <ClipboardList size={11} />
+            )}
+            {t("insert.button")}
+          </button>
+
+          {insertMenuOpen && (
+            <div className="absolute top-full left-0 mt-1 w-72 rounded-lg bg-bg-elevated border border-border shadow-xl shadow-black/40 z-20 animate-popover-in">
+              <div className="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wide text-text-faint">
+                {t("insert.title")}
+              </div>
+              <div className="px-3 py-2 flex flex-col gap-1.5">
+                <span className="text-[10px] text-text-faint">{t("insert.targetTable")}</span>
+                <div className="flex items-center gap-1">
+                  <input
+                    value={insertTarget.schema}
+                    onChange={(e) =>
+                      setInsertTarget((s) => ({ ...s, schema: e.target.value }))
+                    }
+                    placeholder="schema"
+                    className="filter-input w-20 text-[11px]"
+                  />
+                  <span className="text-text-faint">.</span>
+                  <input
+                    value={insertTarget.table}
+                    onChange={(e) =>
+                      setInsertTarget((s) => ({ ...s, table: e.target.value }))
+                    }
+                    placeholder="table"
+                    className="filter-input flex-1 text-[11px]"
+                  />
+                </div>
+              </div>
+              <div className="border-t border-border" />
+              <button
+                onClick={() => copyInserts("page")}
+                disabled={insertWorking || !insertTarget.table}
+                className="w-full flex items-center gap-2 px-3 py-2 text-[11px] text-text-secondary hover:bg-bg-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-left"
+              >
+                {insertCopied === "page" ? (
+                  <>
+                    <Check size={11} className="text-success" />
+                    {t("insert.copied")}
+                  </>
+                ) : (
+                  <>
+                    <Copy size={11} className="text-text-faint" />
+                    {t("insert.copyCurrentPage", { count: result.row_count })}
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => copyInserts("all")}
+                disabled={insertWorking || !insertTarget.table}
+                className="w-full flex flex-col items-start gap-0.5 px-3 py-2 text-[11px] text-text-secondary hover:bg-bg-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-left border-t border-border"
+              >
+                <span className="flex items-center gap-2">
+                  {insertCopied === "all" ? (
+                    <>
+                      <Check size={11} className="text-success" />
+                      {t("insert.copied")}
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={11} className="text-text-faint" />
+                      {t("insert.copyAll")}
+                    </>
+                  )}
+                </span>
+                <span className="text-[10px] text-text-faint pl-[19px]">
+                  {t("export.allRowsHint")}
+                </span>
+              </button>
+              {insertError && (
+                <div className="px-3 py-1.5 text-[10px] text-error border-t border-border">
+                  {insertError}
+                </div>
+              )}
             </div>
           )}
         </div>

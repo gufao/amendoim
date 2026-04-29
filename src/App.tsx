@@ -86,11 +86,25 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const unlisten = listen<{ sql: string; title: string }>(
+    const unlisten = listen<{ sql: string; title: string; connection_id?: string | null }>(
       "mcp-execute-query",
-      (event) => {
-        const { sql, title } = event.payload;
-        const query = addQuery(activeConnectionId, title, sql);
+      async (event) => {
+        const { sql, title, connection_id } = event.payload;
+        // If the AI specified a connection, switch to it before running so the
+        // user actually executes against the database the AI picked.
+        let targetConnectionId = activeConnectionId;
+        if (connection_id) {
+          const { switchConnection, connections } = useConnectionStore.getState();
+          if (connections.some((c) => c.id === connection_id)) {
+            try {
+              await switchConnection(connection_id);
+              targetConnectionId = connection_id;
+            } catch {
+              // Fall through with active connection if switch fails.
+            }
+          }
+        }
+        const query = addQuery(targetConnectionId, title, sql);
         setActiveQueryId(query.id);
         setSql(sql);
         executeQuery();
@@ -99,7 +113,7 @@ function App() {
     return () => {
       unlisten.then((f) => f());
     };
-  }, [addQuery, setActiveQueryId, setSql, executeQuery]);
+  }, [addQuery, setActiveQueryId, setSql, executeQuery, activeConnectionId]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {

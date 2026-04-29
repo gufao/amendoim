@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::convert::Infallible;
+use std::fs;
 use std::sync::Arc;
 
 use axum::extract::{Query, State};
@@ -10,9 +11,11 @@ use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::Deserialize;
 use serde_json::json;
+use tauri::Manager;
 use tokio::sync::{mpsc, Mutex};
 
 use crate::db::connection::SharedConnectionManager;
+use crate::models::connection::SavedConnections;
 
 use super::protocol::{JsonRpcRequest, JsonRpcResponse};
 use super::tools;
@@ -184,7 +187,7 @@ async fn handle_request(state: &McpAppState, request: &JsonRpcRequest) -> JsonRp
                 .cloned()
                 .unwrap_or(json!({}));
 
-            // execute_query doesn't need a DB pool
+            // execute_query is dispatched to the frontend; no DB pool needed.
             if tool_name == "execute_query" {
                 return match tools::handle_execute_query(&arguments, &state.app_handle) {
                     Ok(result) => JsonRpcResponse::success(request.id.clone(), result),
@@ -198,9 +201,35 @@ async fn handle_request(state: &McpAppState, request: &JsonRpcRequest) -> JsonRp
                 };
             }
 
-            // Schema tools need DB access
+            // list_connections enumerates saved connections and marks which
+            // are currently connected, so the AI can ask the user to choose.
+            if tool_name == "list_connections" {
+                return match list_connections_text(&state).await {
+                    Ok(text) => JsonRpcResponse::success(
+                        request.id.clone(),
+                        json!({"content": [{"type": "text", "text": text}]}),
+                    ),
+                    Err(e) => JsonRpcResponse::success(
+                        request.id.clone(),
+                        json!({
+                            "content": [{"type": "text", "text": format!("Error: {}", e)}],
+                            "isError": true
+                        }),
+                    ),
+                };
+            }
+
+            // Schema tools need DB access. If connection_id is provided, route
+            // to that specific pool; otherwise fall back to the active one.
+            let connection_id = arguments
+                .get("connection_id")
+                .and_then(|v| v.as_str());
             let manager = state.connection_manager.lock().await;
-            match manager.get_active_pool() {
+            let pool_result = match connection_id {
+                Some(id) => manager.get_pool_by_id(id),
+                None => manager.get_active_pool(),
+            };
+            match pool_result {
                 Ok(pool) => {
                     match tools::handle_schema_tool(pool, tool_name, &arguments).await {
                         Ok(result) => JsonRpcResponse::success(request.id.clone(), result),
@@ -213,10 +242,10 @@ async fn handle_request(state: &McpAppState, request: &JsonRpcRequest) -> JsonRp
                         ),
                     }
                 }
-                Err(_) => JsonRpcResponse::success(
+                Err(e) => JsonRpcResponse::success(
                     request.id.clone(),
                     json!({
-                        "content": [{"type": "text", "text": "No active database connection in Amendoim. Please connect to a database first."}],
+                        "content": [{"type": "text", "text": format!("{}. Use list_connections to see available connections.", e)}],
                         "isError": true
                     }),
                 ),
@@ -231,4 +260,59 @@ async fn handle_request(state: &McpAppState, request: &JsonRpcRequest) -> JsonRp
             format!("Method not found: {}", request.method),
         ),
     }
+}
+
+async fn list_connections_text(state: &McpAppState) -> Result<String, String> {
+    let path = state
+        .app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?
+        .join("connections.json");
+
+    let saved: SavedConnections = if path.exists() {
+        let data = fs::read_to_string(&path)
+            .map_err(|e| format!("Failed to read connections: {}", e))?;
+        serde_json::from_str(&data)
+            .map_err(|e| format!("Failed to parse connections: {}", e))?
+    } else {
+        SavedConnections::default()
+    };
+
+    let manager = state.connection_manager.lock().await;
+    let active = manager.active_id().map(|s| s.to_string());
+    let connected: std::collections::HashSet<String> =
+        manager.connected_ids().into_iter().collect();
+    drop(manager);
+
+    if saved.connections.is_empty() {
+        return Ok("No saved connections.".to_string());
+    }
+
+    let mut lines = Vec::new();
+    for c in &saved.connections {
+        let is_connected = connected.contains(&c.id);
+        let is_active = active.as_deref() == Some(c.id.as_str());
+        let mut tags = Vec::new();
+        if is_active {
+            tags.push("active");
+        } else if is_connected {
+            tags.push("connected");
+        } else {
+            tags.push("not connected");
+        }
+        lines.push(format!(
+            "- id: {}\n  name: {}\n  host: {}:{}\n  database: {}\n  status: {}",
+            c.id,
+            c.name,
+            c.host,
+            c.port,
+            c.database,
+            tags.join(", ")
+        ));
+    }
+    Ok(format!(
+        "Connections (pass `connection_id` to other tools to select one):\n{}",
+        lines.join("\n")
+    ))
 }

@@ -8,11 +8,25 @@ use crate::db::queries;
 pub fn tool_definitions() -> Value {
     json!([
         {
+            "name": "list_connections",
+            "description": "List all currently connected PostgreSQL databases (id, name, host, database). Use this when the user has multiple connections — ASK the user which one to query before calling other tools, or pass the chosen connection_id explicitly. If only one is connected, you can skip this and the active connection is used by default.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        },
+        {
             "name": "list_schemas",
             "description": "List all database schemas. Use this first to discover what schemas are available.",
             "inputSchema": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    "connection_id": {
+                        "type": "string",
+                        "description": "Optional connection id (from list_connections). If omitted, the user's active connection is used."
+                    }
+                },
                 "required": []
             }
         },
@@ -25,6 +39,10 @@ pub fn tool_definitions() -> Value {
                     "schema": {
                         "type": "string",
                         "description": "The schema name (e.g. 'public')"
+                    },
+                    "connection_id": {
+                        "type": "string",
+                        "description": "Optional connection id. Defaults to the active connection."
                     }
                 },
                 "required": ["schema"]
@@ -43,6 +61,10 @@ pub fn tool_definitions() -> Value {
                     "table": {
                         "type": "string",
                         "description": "The table name"
+                    },
+                    "connection_id": {
+                        "type": "string",
+                        "description": "Optional connection id. Defaults to the active connection."
                     }
                 },
                 "required": ["schema", "table"]
@@ -61,6 +83,10 @@ pub fn tool_definitions() -> Value {
                     "title": {
                         "type": "string",
                         "description": "Optional title for the query tab"
+                    },
+                    "connection_id": {
+                        "type": "string",
+                        "description": "Optional connection id (from list_connections). If omitted, the user's active connection is used. If multiple connections are open, ASK the user before assuming."
                     }
                 },
                 "required": ["sql"]
@@ -73,6 +99,7 @@ pub fn tool_definitions() -> Value {
 struct McpQueryEvent {
     sql: String,
     title: String,
+    connection_id: Option<String>,
 }
 
 pub fn handle_execute_query(
@@ -87,6 +114,10 @@ pub fn handle_execute_query(
         .get("title")
         .and_then(|v| v.as_str())
         .unwrap_or("AI Query");
+    let connection_id = arguments
+        .get("connection_id")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
 
     app_handle
         .emit(
@@ -94,6 +125,7 @@ pub fn handle_execute_query(
             McpQueryEvent {
                 sql: sql.to_string(),
                 title: title.to_string(),
+                connection_id,
             },
         )
         .map_err(|e| format!("Failed to emit event: {}", e))?;

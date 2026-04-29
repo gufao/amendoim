@@ -75,6 +75,15 @@ export const ptBR = {
   "export.allRows": "Todas as linhas",
   "export.allRowsHint": "Pode demorar em tabelas grandes",
   "export.exporting": "Exportando...",
+  "export.includeHeader": "Incluir cabeçalho",
+
+  // Insert generator
+  "insert.button": "Copiar como INSERT",
+  "insert.title": "Gerar INSERT",
+  "insert.targetTable": "Tabela alvo",
+  "insert.copyCurrentPage": "Copiar página atual ({count})",
+  "insert.copyAll": "Copiar todas as linhas",
+  "insert.copied": "Copiado!",
 
   // Status Bar
   "status.rows": "{count} linhas",

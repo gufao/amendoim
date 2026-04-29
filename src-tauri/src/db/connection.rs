@@ -71,6 +71,12 @@ impl ConnectionManager {
         self.pools.get(id).ok_or("Connection pool not found".into())
     }
 
+    pub fn get_pool_by_id(&self, id: &str) -> Result<&PgPool, String> {
+        self.pools
+            .get(id)
+            .ok_or_else(|| format!("Connection '{}' is not connected", id))
+    }
+
     pub fn active_id(&self) -> Option<&str> {
         self.active_id.as_deref()
     }

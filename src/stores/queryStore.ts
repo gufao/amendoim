@@ -164,6 +164,40 @@ export const useQueryStore = create<QueryState>((set, get) => ({
       const result = await api.executeQuery(sql, state.pageSize, state.page * state.pageSize);
       trackEvent("query_executed", { row_count: result.row_count, time_ms: result.execution_time_ms });
       set({ result, isExecuting: false, activeView: "data" });
+
+      // Best-effort async total-row count for raw SELECT queries that didn't
+      // come through the preview/filter paths (those set total_rows already).
+      // No-op on DML, multi-statement, or anything we can't safely wrap.
+      const upper = sql.toUpperCase();
+      const isSelect = upper.startsWith("SELECT") || upper.startsWith("WITH");
+      const alreadyHasTotal = result.total_rows !== null && result.total_rows !== undefined;
+      if (
+        isSelect &&
+        result.affected_rows === null &&
+        !alreadyHasTotal &&
+        !get().tableContext
+      ) {
+        const stripped = sql.replace(/;+\s*$/, "").trim();
+        const countSql = `SELECT count(*) AS total FROM (${stripped}) _ame_count`;
+        api
+          .executeQuery(countSql, undefined, undefined)
+          .then((cr) => {
+            const raw = cr.rows[0]?.["total"];
+            const totalNum =
+              typeof raw === "number" ? raw : parseInt(String(raw ?? ""), 10);
+            if (!Number.isFinite(totalNum)) return;
+            set((s) => {
+              if (s.result !== result) return s;
+              return {
+                result: { ...s.result, total_rows: totalNum, total_rows_estimated: false },
+              };
+            });
+          })
+          .catch(() => {
+            // Silent: counting is best-effort. Some queries (multi-statement,
+            // SET, etc.) can't be wrapped as a subquery — that's fine.
+          });
+      }
     } catch (e) {
       const errorStr = String(e);
       const isCancelled = errorStr.includes("57014") || errorStr.toLowerCase().includes("cancel");
