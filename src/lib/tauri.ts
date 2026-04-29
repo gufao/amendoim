@@ -105,8 +105,8 @@ export const executeQuery = (sql: string, limit?: number, offset?: number) =>
 export const previewTable = (schema: string, table: string, limit?: number, offset?: number) =>
   invoke<QueryResult>("preview_table", { schema, table, limit, offset });
 
-export const exportCsv = (sql: string) =>
-  invoke<string>("export_csv", { sql });
+export const exportCsv = (sql: string, limit?: number, offset?: number) =>
+  invoke<string>("export_csv", { sql, limit, offset });
 
 export const cancelQuery = () =>
   invoke<void>("cancel_query");

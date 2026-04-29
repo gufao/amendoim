@@ -68,6 +68,8 @@ pub async fn export_csv(
     state: State<'_, SharedConnectionManager>,
     pids: State<'_, ActiveQueryPids>,
     sql: String,
+    limit: Option<i64>,
+    offset: Option<i64>,
 ) -> Result<String, String> {
     let (pool, connection_id) = {
         let manager = state.lock().await;
@@ -75,7 +77,7 @@ pub async fn export_csv(
         let pool = manager.get_active_pool()?.clone();
         (pool, connection_id)
     };
-    let result = executor::execute_query(&pool, &sql, None, None, &pids, &connection_id).await?;
+    let result = executor::execute_query(&pool, &sql, limit, offset, &pids, &connection_id).await?;
 
     if result.columns.is_empty() {
         return Ok(String::new());

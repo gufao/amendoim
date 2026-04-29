@@ -76,7 +76,9 @@ export function ResultsToolbar() {
     setExporting(true);
     try {
       const sqlToRun = scope === "all" ? stripPaginationClauses(sql) : sql;
-      const csv = await exportCsv(sqlToRun);
+      const limit = scope === "page" ? pageSize : undefined;
+      const offset = scope === "page" ? page * pageSize : undefined;
+      const csv = await exportCsv(sqlToRun, limit, offset);
       const blob = new Blob([csv], { type: "text/csv" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
