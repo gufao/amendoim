@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from "react";
 import { Plus, X, Search, Code2, Copy, Check } from "lucide-react";
-import { useQueryStore, FILTER_OPERATORS, ANY_COLUMN_OPERATORS, ANY_COLUMN_VALUE, buildFilteredSql } from "../../stores/queryStore";
+import { useQueryStore, FILTER_OPERATORS, ANY_COLUMN_OPERATORS, ANY_COLUMN_VALUE, buildFilteredSql, defaultOperatorForType } from "../../stores/queryStore";
 import { useFilterQuery } from "../../hooks/useQuery";
 import { useT } from "../../i18n";
 
@@ -182,11 +182,15 @@ export function FilterBar() {
               onChange={(e) => {
                 const newCol = e.target.value;
                 const newOps = getOperators(newCol);
-                const updates: Record<string, string> = { column: newCol };
-                if (!newOps.some((op) => op.value === filter.operator)) {
-                  updates.operator = newOps[0].value;
-                }
-                updateFilter(filter.id, updates);
+                const colMeta = columns.find((c) => c.name === newCol);
+                const desiredOp = newCol === ANY_COLUMN_VALUE
+                  ? "LIKE"
+                  : defaultOperatorForType(colMeta?.data_type);
+                const opIsAvailable = newOps.some((op) => op.value === desiredOp);
+                updateFilter(filter.id, {
+                  column: newCol,
+                  operator: opIsAvailable ? desiredOp : newOps[0].value,
+                });
               }}
               className={`filter-select flex-1 min-w-[100px] max-w-[160px] ${
                 filter.column === ANY_COLUMN_VALUE ? "italic text-accent" : ""

@@ -33,6 +33,22 @@ export const ANY_COLUMN_OPERATORS = [
 
 export const ANY_COLUMN_VALUE = "__any__";
 
+// PostgreSQL type names returned by the backend (executor.rs pg_value_to_json
+// uses these uppercase names from sqlx's PgTypeInfo). Types where `=` is the
+// natural default. Text-like types (TEXT/VARCHAR/JSON/JSONB/etc.) keep `LIKE`.
+const EXACT_MATCH_TYPES = new Set([
+  "UUID",
+  "INT2", "INT4", "INT8",
+  "FLOAT4", "FLOAT8", "NUMERIC",
+  "BOOL",
+  "DATE", "TIMESTAMP", "TIMESTAMPTZ", "TIME", "TIMETZ",
+]);
+
+export function defaultOperatorForType(dataType: string | undefined): string {
+  if (dataType && EXACT_MATCH_TYPES.has(dataType.toUpperCase())) return "=";
+  return "LIKE";
+}
+
 interface QueryState {
   activeView: "editor" | "data";
   activeQueryId: string | null;
