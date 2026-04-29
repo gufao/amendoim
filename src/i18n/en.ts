@@ -91,6 +91,10 @@ export const en: Record<TranslationKey, string> = {
   "status.rows": "{count} rows",
   "status.rowsOfTotal": "{count} rows of {total} total",
   "status.rowsOfTotalEst": "{count} rows of ~{total} total (estimated)",
+  "results.rowsOfTotal": "{count} of {total} rows",
+  "results.rowsOfTotalEst": "{count} of ~{total} rows",
+  "results.pageOfTotal": "{page} / {total}",
+  "results.rowsShort": "{count} rows",
   "status.affected": "{count} affected",
 
   // Filter Bar

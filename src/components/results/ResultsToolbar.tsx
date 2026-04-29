@@ -13,7 +13,7 @@ import {
 import { useToolbarQuery, useResultsQuery } from "../../hooks/useQuery";
 import { useT } from "../../i18n";
 import { exportCsv, executeQuery as runQuery } from "../../lib/tauri";
-import { generateInsertStatements, inferTableFromSql } from "../../lib/format";
+import { generateInsertStatements, inferTableFromSql, formatRowCount } from "../../lib/format";
 
 function stripPaginationClauses(sql: string): string {
   // Strip trailing LIMIT/OFFSET (in either order) and trailing semicolons.
@@ -111,7 +111,14 @@ export function ResultsToolbar() {
 
   if (!result) return null;
 
-  const hasMore = result.row_count >= pageSize;
+  const total = result.total_rows;
+  const hasKnownTotal = typeof total === "number";
+  const totalPages = hasKnownTotal && pageSize > 0
+    ? Math.max(1, Math.ceil(total / pageSize))
+    : null;
+  const hasMore = totalPages !== null
+    ? page + 1 < totalPages
+    : result.row_count >= pageSize;
 
   const pendingCount = Object.values(pendingChanges || {}).reduce(
     (sum, changes) => sum + Object.keys(changes).length,
@@ -384,6 +391,16 @@ export function ResultsToolbar() {
           </select>
         </div>
 
+        {result.row_count > 0 && (
+          <span className="text-text-faint tabular-nums">
+            {hasKnownTotal
+              ? t(result.total_rows_estimated ? "results.rowsOfTotalEst" : "results.rowsOfTotal", {
+                  count: formatRowCount(result.row_count),
+                  total: formatRowCount(total!),
+                })
+              : t("results.rowsShort", { count: formatRowCount(result.row_count) })}
+          </span>
+        )}
         <div className="flex items-center gap-0.5">
           <button
             onClick={() => setPage(page - 1)}
@@ -393,7 +410,9 @@ export function ResultsToolbar() {
             <ChevronLeft size={14} />
           </button>
           <span className="text-text-muted px-1.5 tabular-nums min-w-[48px] text-center">
-            {page + 1}
+            {totalPages !== null
+              ? t("results.pageOfTotal", { page: page + 1, total: totalPages })
+              : page + 1}
           </span>
           <button
             onClick={() => setPage(page + 1)}
