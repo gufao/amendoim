@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Download,
   ChevronLeft,
@@ -10,6 +10,18 @@ import {
 import { useToolbarQuery } from "../../hooks/useQuery";
 import { useT } from "../../i18n";
 import { exportCsv } from "../../lib/tauri";
+
+function stripPaginationClauses(sql: string): string {
+  // Strip trailing LIMIT/OFFSET (in either order) and trailing semicolons.
+  // Repeats so `LIMIT n OFFSET m` and `OFFSET m LIMIT n` both peel off.
+  let out = sql.trim().replace(/;+\s*$/, "");
+  for (let i = 0; i < 2; i++) {
+    out = out
+      .replace(/\s+OFFSET\s+\d+\s*$/i, "")
+      .replace(/\s+LIMIT\s+\d+\s*$/i, "");
+  }
+  return out.trim();
+}
 
 export function ResultsToolbar() {
   const {
@@ -26,8 +38,28 @@ export function ResultsToolbar() {
   } = useToolbarQuery();
   const t = useT();
   const [exporting, setExporting] = useState(false);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const exportRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!exportMenuOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
+        setExportMenuOpen(false);
+      }
+    };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setExportMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [exportMenuOpen]);
 
   if (!result) return null;
 
@@ -38,16 +70,18 @@ export function ResultsToolbar() {
     0
   );
 
-  const handleExport = async () => {
+  const runExport = async (scope: "page" | "all") => {
     if (!sql.trim()) return;
+    setExportMenuOpen(false);
     setExporting(true);
     try {
-      const csv = await exportCsv(sql);
+      const sqlToRun = scope === "all" ? stripPaginationClauses(sql) : sql;
+      const csv = await exportCsv(sqlToRun);
       const blob = new Blob([csv], { type: "text/csv" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${title || "query"}_results.csv`;
+      a.download = `${title || "query"}_results${scope === "all" ? "_all" : ""}.csv`;
       a.click();
       URL.revokeObjectURL(url);
     } catch {
@@ -82,18 +116,47 @@ export function ResultsToolbar() {
   return (
     <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-bg-surface text-[11px] shrink-0">
       <div className="flex items-center gap-1">
-        <button
-          onClick={handleExport}
-          disabled={exporting}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-text-muted hover:bg-bg-hover hover:text-text-secondary transition-colors"
-        >
-          {exporting ? (
-            <Loader2 size={11} className="animate-spin" />
-          ) : (
-            <Download size={11} />
+        <div className="relative" ref={exportRef}>
+          <button
+            onClick={() => !exporting && setExportMenuOpen((v) => !v)}
+            disabled={exporting}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-text-muted hover:bg-bg-hover hover:text-text-secondary transition-colors"
+          >
+            {exporting ? (
+              <Loader2 size={11} className="animate-spin" />
+            ) : (
+              <Download size={11} />
+            )}
+            {exporting ? t("export.exporting") : t("results.exportCsv")}
+          </button>
+
+          {exportMenuOpen && (
+            <div className="absolute top-full left-0 mt-1 w-56 rounded-lg bg-bg-elevated border border-border shadow-xl shadow-black/40 z-20 animate-popover-in">
+              <div className="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wide text-text-faint">
+                {t("export.title")}
+              </div>
+              <button
+                onClick={() => runExport("page")}
+                className="w-full flex items-center gap-2 px-3 py-2 text-[11px] text-text-secondary hover:bg-bg-hover transition-colors text-left"
+              >
+                <Download size={11} className="text-text-faint" />
+                {t("export.currentPage", { count: result.row_count })}
+              </button>
+              <button
+                onClick={() => runExport("all")}
+                className="w-full flex flex-col items-start gap-0.5 px-3 py-2 text-[11px] text-text-secondary hover:bg-bg-hover transition-colors text-left border-t border-border"
+              >
+                <span className="flex items-center gap-2">
+                  <Download size={11} className="text-text-faint" />
+                  {t("export.allRows")}
+                </span>
+                <span className="text-[10px] text-text-faint pl-[19px]">
+                  {t("export.allRowsHint")}
+                </span>
+              </button>
+            </div>
           )}
-          {t("results.exportCsv")}
-        </button>
+        </div>
 
         {pendingCount > 0 && (
           <div className="flex items-center gap-1 ml-2 pl-2 border-l border-border">

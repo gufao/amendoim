@@ -72,6 +72,11 @@ export const en: Record<TranslationKey, string> = {
   "results.exportCsv": "Export CSV",
   "results.rows": "Rows:",
   "results.null": "NULL",
+  "export.title": "Export rows",
+  "export.currentPage": "Current page ({count})",
+  "export.allRows": "All rows",
+  "export.allRowsHint": "May take a while on large tables",
+  "export.exporting": "Exporting...",
 
   // Status Bar
   "status.rows": "{count} rows",

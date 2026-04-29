@@ -70,6 +70,11 @@ export const ptBR = {
   "results.exportCsv": "Exportar CSV",
   "results.rows": "Linhas:",
   "results.null": "NULO",
+  "export.title": "Exportar linhas",
+  "export.currentPage": "Página atual ({count})",
+  "export.allRows": "Todas as linhas",
+  "export.allRowsHint": "Pode demorar em tabelas grandes",
+  "export.exporting": "Exportando...",
 
   // Status Bar
   "status.rows": "{count} linhas",
