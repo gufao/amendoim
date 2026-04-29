@@ -201,6 +201,19 @@ async fn handle_request(state: &McpAppState, request: &JsonRpcRequest) -> JsonRp
                 };
             }
 
+            if tool_name == "execute_query_from_path" {
+                return match tools::handle_execute_query_from_path(&arguments, &state.app_handle) {
+                    Ok(result) => JsonRpcResponse::success(request.id.clone(), result),
+                    Err(e) => JsonRpcResponse::success(
+                        request.id.clone(),
+                        json!({
+                            "content": [{"type": "text", "text": format!("Error: {}", e)}],
+                            "isError": true
+                        }),
+                    ),
+                };
+            }
+
             // list_connections enumerates saved connections and marks which
             // are currently connected, so the AI can ask the user to choose.
             if tool_name == "list_connections" {

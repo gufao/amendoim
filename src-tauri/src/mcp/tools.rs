@@ -91,6 +91,28 @@ pub fn tool_definitions() -> Value {
                 },
                 "required": ["sql"]
             }
+        },
+        {
+            "name": "execute_query_from_path",
+            "description": "Execute SQL read from a local file. Use this when the SQL is too large to fit in a tool argument. The LLM client (Claude Code) writes the .sql file with its file tools, then passes the absolute path here. The Amendoim app reads the file and opens the SQL in a new tab. Hard limit: 50 MB. UTF-8 only.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Absolute path to a .sql file readable by Amendoim."
+                    },
+                    "title": {
+                        "type": "string",
+                        "description": "Optional title for the query tab."
+                    },
+                    "connection_id": {
+                        "type": "string",
+                        "description": "Optional connection id (from list_connections). If omitted, the user's active connection is used."
+                    }
+                },
+                "required": ["path"]
+            }
         }
     ])
 }
@@ -100,6 +122,35 @@ struct McpQueryEvent {
     sql: String,
     title: String,
     connection_id: Option<String>,
+}
+
+const MAX_SQL_FILE_BYTES: u64 = 50 * 1024 * 1024;
+
+/// Validate the path and read the file. Returns the SQL on success.
+/// Errors are user-facing strings that get surfaced as tool errors.
+pub fn read_sql_from_path(path: &str) -> Result<String, String> {
+    let p = std::path::Path::new(path);
+    if !p.is_absolute() {
+        return Err(format!("Path must be absolute, got: {}", path));
+    }
+    let metadata = std::fs::metadata(p)
+        .map_err(|e| format!("Cannot read path '{}': {}", path, e))?;
+    if !metadata.is_file() {
+        return Err(format!("Path is not a regular file: {}", path));
+    }
+    if metadata.len() > MAX_SQL_FILE_BYTES {
+        return Err(format!(
+            "File is {} bytes, exceeds 50 MB limit",
+            metadata.len()
+        ));
+    }
+    std::fs::read_to_string(p).map_err(|e| {
+        if e.kind() == std::io::ErrorKind::InvalidData {
+            format!("File is not valid UTF-8: {}", path)
+        } else {
+            format!("Failed to read file '{}': {}", path, e)
+        }
+    })
 }
 
 pub fn handle_execute_query(
@@ -134,6 +185,44 @@ pub fn handle_execute_query(
         "content": [{
             "type": "text",
             "text": "Query sent to Amendoim. The results are displayed in the app for the user to see. You do not have access to the query results."
+        }]
+    }))
+}
+
+pub fn handle_execute_query_from_path(
+    arguments: &Value,
+    app_handle: &tauri::AppHandle,
+) -> Result<Value, String> {
+    let path = arguments
+        .get("path")
+        .and_then(|v| v.as_str())
+        .ok_or("Missing 'path' argument")?;
+    let title = arguments
+        .get("title")
+        .and_then(|v| v.as_str())
+        .unwrap_or("AI Query");
+    let connection_id = arguments
+        .get("connection_id")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    let sql = read_sql_from_path(path)?;
+
+    app_handle
+        .emit(
+            "mcp-execute-query",
+            McpQueryEvent {
+                sql,
+                title: title.to_string(),
+                connection_id,
+            },
+        )
+        .map_err(|e| format!("Failed to emit event: {}", e))?;
+
+    Ok(json!({
+        "content": [{
+            "type": "text",
+            "text": format!("SQL from {} sent to Amendoim. Results display in the app for the user.", path)
         }]
     }))
 }
@@ -228,5 +317,48 @@ pub async fn handle_schema_tool(
             }))
         }
         _ => Err(format!("Unknown tool: {}", tool_name)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::read_sql_from_path;
+    use std::io::Write;
+
+    #[test]
+    fn rejects_relative_paths() {
+        let err = read_sql_from_path("relative/path.sql").unwrap_err();
+        assert!(err.contains("absolute"), "got: {}", err);
+    }
+
+    #[test]
+    fn rejects_missing_file() {
+        let err = read_sql_from_path("/this/path/should/not/exist.sql").unwrap_err();
+        assert!(err.contains("Cannot read path"), "got: {}", err);
+    }
+
+    #[test]
+    fn reads_valid_utf8_file() {
+        let mut tf = tempfile::NamedTempFile::new().unwrap();
+        writeln!(tf, "SELECT 1; -- hi").unwrap();
+        let path = tf.path().to_str().unwrap();
+        let sql = read_sql_from_path(path).unwrap();
+        assert!(sql.contains("SELECT 1"));
+    }
+
+    #[test]
+    fn rejects_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        let err = read_sql_from_path(dir.path().to_str().unwrap()).unwrap_err();
+        assert!(err.contains("not a regular file"), "got: {}", err);
+    }
+
+    #[test]
+    fn rejects_invalid_utf8() {
+        let mut tf = tempfile::NamedTempFile::new().unwrap();
+        tf.write_all(&[0xff, 0xfe, 0xfd]).unwrap();
+        let path = tf.path().to_str().unwrap();
+        let err = read_sql_from_path(path).unwrap_err();
+        assert!(err.to_lowercase().contains("utf-8"), "got: {}", err);
     }
 }
