@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { QueryResult } from "../lib/tauri";
 import * as api from "../lib/tauri";
 import { trackEvent } from "../lib/analytics";
+import { useConnectionStore } from "./connectionStore";
 
 export interface Filter {
   id: string;
@@ -32,6 +33,86 @@ export const ANY_COLUMN_OPERATORS = [
 ] as const;
 
 export const ANY_COLUMN_VALUE = "__any__";
+
+// --- Per-table state cache (filters, page, pageSize) ---
+
+interface TableState {
+  filters: Filter[];
+  page: number;
+  pageSize: number;
+  /** Updated on every write; used for LRU eviction. */
+  lastUsed: number;
+}
+
+const TABLE_CACHE_KEY = "amendoim.tableStateCache.v1";
+const TABLE_CACHE_LIMIT = 50;
+
+function tableCacheKey(connectionId: string, schema: string, table: string): string {
+  return `${connectionId}::${schema}.${table}`;
+}
+
+function loadTableCache(): Record<string, TableState> {
+  try {
+    const raw = localStorage.getItem(TABLE_CACHE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object") return parsed as Record<string, TableState>;
+    return {};
+  } catch {
+    return {};
+  }
+}
+
+let cacheWriteTimer: ReturnType<typeof setTimeout> | null = null;
+function persistTableCache(cache: Record<string, TableState>) {
+  if (cacheWriteTimer) clearTimeout(cacheWriteTimer);
+  cacheWriteTimer = setTimeout(() => {
+    try {
+      // Enforce LRU cap at write time.
+      const entries = Object.entries(cache);
+      if (entries.length > TABLE_CACHE_LIMIT) {
+        entries.sort((a, b) => b[1].lastUsed - a[1].lastUsed);
+        const trimmed: Record<string, TableState> = {};
+        for (const [k, v] of entries.slice(0, TABLE_CACHE_LIMIT)) trimmed[k] = v;
+        localStorage.setItem(TABLE_CACHE_KEY, JSON.stringify(trimmed));
+        return;
+      }
+      localStorage.setItem(TABLE_CACHE_KEY, JSON.stringify(cache));
+    } catch {
+      // localStorage full or disabled — silently drop. The cache is best-effort.
+    }
+  }, 250);
+}
+
+function writeTableState(
+  connectionId: string,
+  schema: string,
+  table: string,
+  state: { filters: Filter[]; page: number; pageSize: number }
+) {
+  const cache = loadTableCache();
+  cache[tableCacheKey(connectionId, schema, table)] = {
+    ...state,
+    lastUsed: Date.now(),
+  };
+  persistTableCache(cache);
+}
+
+export function evictTableCacheForConnection(connectionId: string) {
+  const cache = loadTableCache();
+  let changed = false;
+  for (const k of Object.keys(cache)) {
+    if (k.startsWith(`${connectionId}::`)) {
+      delete cache[k];
+      changed = true;
+    }
+  }
+  if (changed) persistTableCache(cache);
+}
+
+function getActiveConnectionIdSync(): string | null {
+  return useConnectionStore.getState().activeConnectionId;
+}
 
 // PostgreSQL type names returned by the backend (executor.rs pg_value_to_json
 // uses these uppercase names from sqlx's PgTypeInfo). Types where `=` is the
@@ -237,21 +318,40 @@ export const useQueryStore = create<QueryState>((set, get) => ({
   },
 
   previewTable: async (schema, table) => {
-    const { pageSize } = get();
+    const connId = getActiveConnectionIdSync();
+    const cache = loadTableCache();
+    const cached = connId ? cache[tableCacheKey(connId, schema, table)] : undefined;
+
+    const initialFilters = cached?.filters ?? [];
+    const initialPageSize = cached?.pageSize ?? get().pageSize;
+    const hasEnabledFilters = initialFilters.some(
+      (f) => f.enabled && (f.column === ANY_COLUMN_VALUE || f.column)
+    );
+    // applyFilters today doesn't paginate (always shows page 1 of filtered set),
+    // so when restoring filters reset page to 0 to keep the toolbar honest. For
+    // unfiltered preview, restore the cached page.
+    const initialPage = hasEnabledFilters ? 0 : (cached?.page ?? 0);
+
     set({
       isExecuting: true,
       error: null,
       activeView: "data",
       tableContext: { schema, table },
-      filters: [],
+      filters: initialFilters,
       pendingChanges: {},
       selectedRowIndex: null,
-      page: 0,
-      sql: `SELECT * FROM "${schema}"."${table}" LIMIT ${pageSize}`,
+      page: initialPage,
+      pageSize: initialPageSize,
+      sql: `SELECT * FROM "${schema}"."${table}" LIMIT ${initialPageSize} OFFSET ${initialPage * initialPageSize}`,
     });
 
+    if (hasEnabledFilters) {
+      await get().applyFilters();
+      return;
+    }
+
     try {
-      const result = await api.previewTable(schema, table, pageSize, 0);
+      const result = await api.previewTable(schema, table, initialPageSize, initialPage * initialPageSize);
       set({ result, isExecuting: false });
     } catch (e) {
       set({ error: String(e), isExecuting: false });
@@ -286,16 +386,37 @@ export const useQueryStore = create<QueryState>((set, get) => ({
       enabled: true,
     };
     set((s) => ({ filters: [...s.filters, filter] }));
+    const s = get();
+    const connId = getActiveConnectionIdSync();
+    if (connId && s.tableContext) {
+      writeTableState(connId, s.tableContext.schema, s.tableContext.table, {
+        filters: s.filters, page: s.page, pageSize: s.pageSize,
+      });
+    }
   },
 
   updateFilter: (filterId, updates) => {
     set((s) => ({
       filters: s.filters.map((f) => (f.id === filterId ? { ...f, ...updates } : f)),
     }));
+    const s = get();
+    const connId = getActiveConnectionIdSync();
+    if (connId && s.tableContext) {
+      writeTableState(connId, s.tableContext.schema, s.tableContext.table, {
+        filters: s.filters, page: s.page, pageSize: s.pageSize,
+      });
+    }
   },
 
   removeFilter: (filterId) => {
     set((s) => ({ filters: s.filters.filter((f) => f.id !== filterId) }));
+    const s = get();
+    const connId = getActiveConnectionIdSync();
+    if (connId && s.tableContext) {
+      writeTableState(connId, s.tableContext.schema, s.tableContext.table, {
+        filters: s.filters, page: s.page, pageSize: s.pageSize,
+      });
+    }
   },
 
   applyFilters: async () => {
@@ -333,6 +454,12 @@ export const useQueryStore = create<QueryState>((set, get) => ({
   setPage: (page) => {
     set({ page, selectedRowIndex: null });
     const state = get();
+    const connId = getActiveConnectionIdSync();
+    if (connId && state.tableContext) {
+      writeTableState(connId, state.tableContext.schema, state.tableContext.table, {
+        filters: state.filters, page, pageSize: state.pageSize,
+      });
+    }
     const hasActiveFilters = state.filters.some((f) => f.enabled && (f.column === ANY_COLUMN_VALUE || f.column));
     if (state.tableContext && !hasActiveFilters) {
       get().fetchPreviewPage();
@@ -344,6 +471,12 @@ export const useQueryStore = create<QueryState>((set, get) => ({
   setPageSize: (pageSize) => {
     set({ pageSize, page: 0, selectedRowIndex: null });
     const state = get();
+    const connId = getActiveConnectionIdSync();
+    if (connId && state.tableContext) {
+      writeTableState(connId, state.tableContext.schema, state.tableContext.table, {
+        filters: state.filters, page: 0, pageSize,
+      });
+    }
     const hasActiveFilters = state.filters.some((f) => f.enabled && (f.column === ANY_COLUMN_VALUE || f.column));
     if (state.tableContext && !hasActiveFilters) {
       get().fetchPreviewPage();

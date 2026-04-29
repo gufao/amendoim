@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { ConnectionConfig } from "../lib/tauri";
 import * as api from "../lib/tauri";
 import { trackEvent } from "../lib/analytics";
+import { evictTableCacheForConnection } from "./queryStore";
 
 interface ConnectionState {
   connections: ConnectionConfig[];
@@ -54,6 +55,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
   deleteConnection: async (id) => {
     try {
       await api.deleteConnection(id);
+      evictTableCacheForConnection(id);
       const state = get();
       const newConnected = state.connectedIds.filter((cid) => cid !== id);
       if (state.activeConnectionId === id) {
