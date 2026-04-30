@@ -25,6 +25,7 @@ export function useConnection() {
     try {
       await connect(id);
       resetSchema();
+      resetDataState();
       await loadSchemas();
     } catch {
       // error is already set in the store
