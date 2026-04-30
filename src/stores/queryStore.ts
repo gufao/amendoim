@@ -38,7 +38,6 @@ export const ANY_COLUMN_VALUE = "__any__";
 
 interface TableState {
   filters: Filter[];
-  page: number;
   pageSize: number;
   /** Updated on every write; used for LRU eviction. */
   lastUsed: number;
@@ -88,7 +87,7 @@ function writeTableState(
   connectionId: string,
   schema: string,
   table: string,
-  state: { filters: Filter[]; page: number; pageSize: number }
+  state: { filters: Filter[]; pageSize: number }
 ) {
   const cache = loadTableCache();
   cache[tableCacheKey(connectionId, schema, table)] = {
@@ -346,7 +345,12 @@ export const useQueryStore = create<QueryState>((set, get) => ({
 
     const initialFilters = cached?.filters ?? [];
     const initialPageSize = cached?.pageSize ?? get().pageSize;
-    const initialPage = cached?.page ?? 0;
+    // Always start fresh on page 0 when (re-)opening a table. We persist
+    // filters and pageSize per (conn, schema, table), but page is intentionally
+    // session-only — restoring page across app restarts is more confusing than
+    // helpful (user expects to land at the top, not on whichever page they last
+    // browsed).
+    const initialPage = 0;
     const hasEnabledFilters = initialFilters.some(
       (f) => f.enabled && (f.column === ANY_COLUMN_VALUE || f.column)
     );
@@ -415,7 +419,7 @@ export const useQueryStore = create<QueryState>((set, get) => ({
     const connId = getActiveConnectionIdSync();
     if (connId && s.tableContext) {
       writeTableState(connId, s.tableContext.schema, s.tableContext.table, {
-        filters: s.filters, page: s.page, pageSize: s.pageSize,
+        filters: s.filters, pageSize: s.pageSize,
       });
     }
   },
@@ -428,7 +432,7 @@ export const useQueryStore = create<QueryState>((set, get) => ({
     const connId = getActiveConnectionIdSync();
     if (connId && s.tableContext) {
       writeTableState(connId, s.tableContext.schema, s.tableContext.table, {
-        filters: s.filters, page: s.page, pageSize: s.pageSize,
+        filters: s.filters, pageSize: s.pageSize,
       });
     }
   },
@@ -439,7 +443,7 @@ export const useQueryStore = create<QueryState>((set, get) => ({
     const connId = getActiveConnectionIdSync();
     if (connId && s.tableContext) {
       writeTableState(connId, s.tableContext.schema, s.tableContext.table, {
-        filters: s.filters, page: s.page, pageSize: s.pageSize,
+        filters: s.filters, pageSize: s.pageSize,
       });
     }
   },
@@ -488,7 +492,7 @@ export const useQueryStore = create<QueryState>((set, get) => ({
     const connId = getActiveConnectionIdSync();
     if (connId && state.tableContext) {
       writeTableState(connId, state.tableContext.schema, state.tableContext.table, {
-        filters: state.filters, page, pageSize: state.pageSize,
+        filters: state.filters, pageSize: state.pageSize,
       });
     }
     const hasActiveFilters = state.filters.some((f) => f.enabled && (f.column === ANY_COLUMN_VALUE || f.column));
@@ -509,7 +513,7 @@ export const useQueryStore = create<QueryState>((set, get) => ({
     const connId = getActiveConnectionIdSync();
     if (connId && state.tableContext) {
       writeTableState(connId, state.tableContext.schema, state.tableContext.table, {
-        filters: state.filters, page: 0, pageSize,
+        filters: state.filters, pageSize,
       });
     }
     const hasActiveFilters = state.filters.some((f) => f.enabled && (f.column === ANY_COLUMN_VALUE || f.column));
