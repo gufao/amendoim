@@ -114,6 +114,21 @@ function getActiveConnectionIdSync(): string | null {
   return useConnectionStore.getState().activeConnectionId;
 }
 
+/**
+ * After an async query, the user may have switched connection or jumped to
+ * a different table. If so, the result we got is stale — drop it instead of
+ * letting it land on top of fresh state.
+ */
+function isStillCurrent(
+  expectedConnId: string | null,
+  expectedSchema: string,
+  expectedTable: string
+): boolean {
+  if (getActiveConnectionIdSync() !== expectedConnId) return false;
+  const ctx = useQueryStore.getState().tableContext;
+  return ctx?.schema === expectedSchema && ctx?.table === expectedTable;
+}
+
 // PostgreSQL type names returned by the backend (executor.rs pg_value_to_json
 // uses these uppercase names from sqlx's PgTypeInfo). Types where `=` is the
 // natural default. Text-like types (TEXT/VARCHAR/JSON/JSONB/etc.) keep `LIKE`.
@@ -257,10 +272,14 @@ export const useQueryStore = create<QueryState>((set, get) => ({
     const sql = sqlOverride?.trim() || state.sql.trim();
     if (!sql) return;
 
+    const initialConnId = getActiveConnectionIdSync();
     set({ isExecuting: true, error: null, selectedRowIndex: null });
 
     try {
       const result = await api.executeQuery(sql, state.pageSize, state.page * state.pageSize);
+      // If the user switched connection while we were waiting, drop the result
+      // so it doesn't overwrite the new connection's empty state.
+      if (getActiveConnectionIdSync() !== initialConnId) return;
       trackEvent("query_executed", { row_count: result.row_count, time_ms: result.execution_time_ms });
       set({ result, isExecuting: false, activeView: "data" });
 
@@ -298,6 +317,7 @@ export const useQueryStore = create<QueryState>((set, get) => ({
           });
       }
     } catch (e) {
+      if (getActiveConnectionIdSync() !== initialConnId) return;
       const errorStr = String(e);
       const isCancelled = errorStr.includes("57014") || errorStr.toLowerCase().includes("cancel");
       if (!isCancelled) {
@@ -351,8 +371,11 @@ export const useQueryStore = create<QueryState>((set, get) => ({
 
     try {
       const result = await api.previewTable(schema, table, initialPageSize, initialPage * initialPageSize);
+      // Drop result if user switched connection or table while we were waiting.
+      if (!isStillCurrent(connId, schema, table)) return;
       set({ result, isExecuting: false });
     } catch (e) {
+      if (!isStillCurrent(connId, schema, table)) return;
       set({ error: String(e), isExecuting: false });
     }
   },
@@ -361,6 +384,7 @@ export const useQueryStore = create<QueryState>((set, get) => ({
     const state = get();
     if (!state.tableContext) return;
     const { schema, table } = state.tableContext;
+    const initialConnId = getActiveConnectionIdSync();
     const offset = state.page * state.pageSize;
     set({
       isExecuting: true,
@@ -370,8 +394,10 @@ export const useQueryStore = create<QueryState>((set, get) => ({
     });
     try {
       const result = await api.previewTable(schema, table, state.pageSize, offset);
+      if (!isStillCurrent(initialConnId, schema, table)) return;
       set({ result, isExecuting: false });
     } catch (e) {
+      if (!isStillCurrent(initialConnId, schema, table)) return;
       set({ error: String(e), isExecuting: false });
     }
   },
@@ -430,6 +456,7 @@ export const useQueryStore = create<QueryState>((set, get) => ({
     }
 
     const { schema, table } = state.tableContext;
+    const initialConnId = getActiveConnectionIdSync();
     const page = resetPage ? 0 : state.page;
     const offset = page * state.pageSize;
     const allColumns = state.result?.columns.map((c) => c.name) || [];
@@ -439,15 +466,18 @@ export const useQueryStore = create<QueryState>((set, get) => ({
 
     try {
       const result = await api.executeQuery(sql, undefined, undefined);
+      if (!isStillCurrent(initialConnId, schema, table)) return;
       const clauses = activeFilters.map((f) => buildFilterClause(f, allColumns));
       const countSql = `SELECT count(*) as total FROM "${schema}"."${table}" WHERE ${clauses.join(" AND ")}`;
       const countResult = await api.executeQuery(countSql, undefined, undefined);
+      if (!isStillCurrent(initialConnId, schema, table)) return;
       const total = countResult.rows[0]?.["total"];
       result.total_rows = typeof total === "number" ? total : null;
       result.total_rows_estimated = false;
 
       set({ result, isExecuting: false });
     } catch (e) {
+      if (!isStillCurrent(initialConnId, schema, table)) return;
       set({ error: String(e), isExecuting: false });
     }
   },
