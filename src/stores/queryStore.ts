@@ -155,7 +155,7 @@ interface QueryState {
   addFilter: () => void;
   updateFilter: (filterId: string, updates: Partial<Filter>) => void;
   removeFilter: (filterId: string) => void;
-  applyFilters: () => Promise<void>;
+  applyFilters: (opts?: { resetPage?: boolean }) => Promise<void>;
   setPage: (page: number) => void;
   setPageSize: (pageSize: number) => void;
   updateCellValue: (rowIndex: number, column: string, value: unknown) => void;
@@ -204,7 +204,8 @@ export function buildFilteredSql(
   table: string,
   filters: Filter[],
   limit: number,
-  allColumns: string[]
+  allColumns: string[],
+  offset?: number
 ): string {
   const activeFilters = filters.filter((f) => f.enabled && (f.column === ANY_COLUMN_VALUE || f.column));
   let sql = `SELECT * FROM "${schema}"."${table}"`;
@@ -215,6 +216,7 @@ export function buildFilteredSql(
   }
 
   sql += ` LIMIT ${limit}`;
+  if (offset && offset > 0) sql += ` OFFSET ${offset}`;
   return sql;
 }
 
@@ -324,13 +326,10 @@ export const useQueryStore = create<QueryState>((set, get) => ({
 
     const initialFilters = cached?.filters ?? [];
     const initialPageSize = cached?.pageSize ?? get().pageSize;
+    const initialPage = cached?.page ?? 0;
     const hasEnabledFilters = initialFilters.some(
       (f) => f.enabled && (f.column === ANY_COLUMN_VALUE || f.column)
     );
-    // applyFilters today doesn't paginate (always shows page 1 of filtered set),
-    // so when restoring filters reset page to 0 to keep the toolbar honest. For
-    // unfiltered preview, restore the cached page.
-    const initialPage = hasEnabledFilters ? 0 : (cached?.page ?? 0);
 
     set({
       isExecuting: true,
@@ -346,7 +345,7 @@ export const useQueryStore = create<QueryState>((set, get) => ({
     });
 
     if (hasEnabledFilters) {
-      await get().applyFilters();
+      await get().applyFilters({ resetPage: false });
       return;
     }
 
@@ -419,7 +418,7 @@ export const useQueryStore = create<QueryState>((set, get) => ({
     }
   },
 
-  applyFilters: async () => {
+  applyFilters: async ({ resetPage = true }: { resetPage?: boolean } = {}) => {
     const state = get();
     if (!state.tableContext) return;
 
@@ -431,10 +430,12 @@ export const useQueryStore = create<QueryState>((set, get) => ({
     }
 
     const { schema, table } = state.tableContext;
+    const page = resetPage ? 0 : state.page;
+    const offset = page * state.pageSize;
     const allColumns = state.result?.columns.map((c) => c.name) || [];
-    const sql = buildFilteredSql(schema, table, state.filters, state.pageSize, allColumns);
+    const sql = buildFilteredSql(schema, table, state.filters, state.pageSize, allColumns, offset);
 
-    set({ sql, isExecuting: true, error: null, selectedRowIndex: null });
+    set({ sql, page, isExecuting: true, error: null, selectedRowIndex: null });
 
     try {
       const result = await api.executeQuery(sql, undefined, undefined);
@@ -461,8 +462,12 @@ export const useQueryStore = create<QueryState>((set, get) => ({
       });
     }
     const hasActiveFilters = state.filters.some((f) => f.enabled && (f.column === ANY_COLUMN_VALUE || f.column));
-    if (state.tableContext && !hasActiveFilters) {
-      get().fetchPreviewPage();
+    if (state.tableContext) {
+      if (hasActiveFilters) {
+        get().applyFilters({ resetPage: false });
+      } else {
+        get().fetchPreviewPage();
+      }
     } else {
       get().executeQuery();
     }
@@ -478,8 +483,12 @@ export const useQueryStore = create<QueryState>((set, get) => ({
       });
     }
     const hasActiveFilters = state.filters.some((f) => f.enabled && (f.column === ANY_COLUMN_VALUE || f.column));
-    if (state.tableContext && !hasActiveFilters) {
-      get().fetchPreviewPage();
+    if (state.tableContext) {
+      if (hasActiveFilters) {
+        get().applyFilters({ resetPage: true });
+      } else {
+        get().fetchPreviewPage();
+      }
     } else {
       get().executeQuery();
     }
