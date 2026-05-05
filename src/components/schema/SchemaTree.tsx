@@ -11,6 +11,20 @@ import { useSchema } from "../../hooks/useSchema";
 import { useQueryStore } from "../../stores/queryStore";
 import { useT } from "../../i18n";
 
+const TYPE_ABBREVIATIONS: Record<string, string> = {
+  "timestamp with time zone": "timestamptz",
+  "timestamp without time zone": "timestamp",
+  "time with time zone": "timetz",
+  "time without time zone": "time",
+  "character varying": "varchar",
+  "character": "char",
+  "double precision": "float8",
+};
+
+function abbreviateType(type: string): string {
+  return TYPE_ABBREVIATIONS[type] ?? type;
+}
+
 export function SchemaTree() {
   const {
     schemas,
@@ -106,15 +120,16 @@ export function SchemaTree() {
                             <div
                               key={`${tableKey}.${col.name}`}
                               className="flex items-center gap-1.5 pl-14 pr-3 py-[3px] text-text-muted hover:bg-bg-hover cursor-default transition-colors"
+                              title={`${col.name} : ${col.data_type}`}
                             >
                               {col.is_primary_key ? (
                                 <Key size={10} className="text-pk-icon shrink-0" />
                               ) : (
                                 <Columns3 size={10} className="text-column-icon shrink-0" />
                               )}
-                              <span className="truncate">{col.name}</span>
-                              <span className="text-text-faint ml-auto text-[10px] font-mono shrink-0">
-                                {col.data_type}
+                              <span className="flex-1 min-w-0 truncate">{col.name}</span>
+                              <span className="text-text-faint text-[10px] font-mono min-w-0 truncate max-w-[50%]">
+                                {abbreviateType(col.data_type)}
                               </span>
                             </div>
                           ))}
