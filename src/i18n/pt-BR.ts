@@ -11,6 +11,7 @@ export const ptBR = {
   "sidebar.explorer": "Explorador",
   "sidebar.connections": "Conexões",
   "sidebar.newConnection": "Nova Conexão",
+  "sidebar.resize": "Arraste para redimensionar (duplo clique para padrão)",
 
   // Connection
   "connection.new": "Nova Conexão",

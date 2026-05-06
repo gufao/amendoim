@@ -13,6 +13,7 @@ export const en: Record<TranslationKey, string> = {
   "sidebar.explorer": "Explorer",
   "sidebar.connections": "Connections",
   "sidebar.newConnection": "New Connection",
+  "sidebar.resize": "Drag to resize (double-click to reset)",
 
   // Connection
   "connection.new": "New Connection",

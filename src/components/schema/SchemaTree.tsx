@@ -78,7 +78,7 @@ export function SchemaTree() {
                 {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
               </span>
               <Layers size={12} className="text-schema-icon shrink-0" />
-              <span className="truncate font-medium text-text-secondary">{schema.name}</span>
+              <span className="truncate font-medium text-text-secondary" title={schema.name}>{schema.name}</span>
               {schemaTables.length > 0 && (
                 <span className="text-text-faint ml-auto text-[10px] tabular-nums">
                   {schemaTables.length}
@@ -106,7 +106,7 @@ export function SchemaTree() {
                           {isTableExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                         </span>
                         <Table2 size={12} className="text-table-icon shrink-0" />
-                        <span className="truncate text-text-secondary">{table.name}</span>
+                        <span className="truncate text-text-secondary" title={table.name}>{table.name}</span>
                         {table.estimated_rows !== null && table.estimated_rows > 0 && (
                           <span className="text-text-faint ml-auto text-[10px] tabular-nums">
                             ~{table.estimated_rows}

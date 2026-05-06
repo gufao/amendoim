@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Database,
   Plus,
@@ -19,12 +19,71 @@ interface Props {
   onEditConnection: (config: ConnectionConfig) => void;
 }
 
+const SIDEBAR_WIDTH_KEY = "amendoim-sidebar-width";
+const DEFAULT_WIDTH = 240;
+const MIN_WIDTH = 180;
+const MAX_WIDTH = 600;
+
+function clampWidth(n: number) {
+  return Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, n));
+}
+
+function readStoredWidth(): number {
+  try {
+    const raw = localStorage.getItem(SIDEBAR_WIDTH_KEY);
+    if (!raw) return DEFAULT_WIDTH;
+    const n = parseInt(raw, 10);
+    return Number.isFinite(n) ? clampWidth(n) : DEFAULT_WIDTH;
+  } catch {
+    return DEFAULT_WIDTH;
+  }
+}
+
 export function Sidebar({ onNewConnection, onEditConnection }: Props) {
   const t = useT();
   const [collapsed, setCollapsed] = useState(false);
+  const [width, setWidth] = useState<number>(readStoredWidth);
   const activeConnectionId = useConnectionStore((s) => s.activeConnectionId);
   const connections = useConnectionStore((s) => s.connections);
   const activeConn = connections.find((c) => c.id === activeConnectionId);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIDEBAR_WIDTH_KEY, String(width));
+    } catch {
+      // best-effort persistence
+    }
+  }, [width]);
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    let startWidth = 0;
+    setWidth((w) => {
+      startWidth = w;
+      return w;
+    });
+
+    const onMouseMove = (ev: MouseEvent) => {
+      setWidth(clampWidth(startWidth + (ev.clientX - startX)));
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  }, []);
+
+  const handleResizeDoubleClick = useCallback(() => {
+    setWidth(DEFAULT_WIDTH);
+  }, []);
 
   if (collapsed) {
     return (
@@ -49,7 +108,10 @@ export function Sidebar({ onNewConnection, onEditConnection }: Props) {
   }
 
   return (
-    <div className="w-60 bg-bg-secondary border-r border-border flex flex-col h-full">
+    <div
+      className="bg-bg-secondary border-r border-border flex flex-col h-full relative shrink-0"
+      style={{ width: `${width}px` }}
+    >
       <div className="flex items-center justify-between px-3 h-10 border-b border-border shrink-0">
         <span className="text-[11px] font-semibold text-text-secondary uppercase tracking-widest">
           {t("sidebar.explorer")}
@@ -112,6 +174,13 @@ export function Sidebar({ onNewConnection, onEditConnection }: Props) {
           </div>
         )}
       </div>
+
+      <div
+        onMouseDown={handleResizeStart}
+        onDoubleClick={handleResizeDoubleClick}
+        title={t("sidebar.resize")}
+        className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize hover:bg-accent/60 transition-colors z-10"
+      />
     </div>
   );
 }
