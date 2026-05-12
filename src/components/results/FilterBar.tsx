@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect } from "react";
 import { Plus, X, Search, Code2, Copy, Check } from "lucide-react";
+import { writeText as clipboardWriteText } from "@tauri-apps/plugin-clipboard-manager";
 import { useQueryStore, FILTER_OPERATORS, ANY_COLUMN_OPERATORS, ANY_COLUMN_VALUE, buildFilteredSql, defaultOperatorForType } from "../../stores/queryStore";
 import { useFilterQuery } from "../../hooks/useQuery";
 import { useT } from "../../i18n";
@@ -87,7 +88,7 @@ function SqlPreview({
   }, [open]);
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(sql);
+    await clipboardWriteText(sql);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };

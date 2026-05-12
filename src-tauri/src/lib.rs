@@ -15,6 +15,8 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .manage(create_connection_manager())
         .manage(create_active_query_pids())
         .manage(create_mcp_state())
@@ -86,6 +88,7 @@ pub fn run() {
             commands::query::execute_query,
             commands::query::preview_table,
             commands::query::export_csv,
+            commands::query::save_text_file,
             commands::query::cancel_query,
             // MCP commands
             commands::mcp::start_mcp_server,

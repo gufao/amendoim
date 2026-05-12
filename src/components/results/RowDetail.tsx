@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { X, Check } from "lucide-react";
+import { writeText as clipboardWriteText } from "@tauri-apps/plugin-clipboard-manager";
 import { formatCellValue } from "../../lib/format";
 import { useT } from "../../i18n";
 
@@ -17,7 +18,7 @@ export function RowDetail({ rowIndex, rowData, columns, pkColumns, onClose }: Pr
 
   const handleCopy = async (column: string, value: unknown) => {
     const text = formatCellValue(value);
-    await navigator.clipboard.writeText(text);
+    await clipboardWriteText(text);
     setCopiedField(column);
     setTimeout(() => setCopiedField(null), 1500);
   };

@@ -73,6 +73,7 @@ export const en: Record<TranslationKey, string> = {
   "results.exportCsv": "Export CSV",
   "results.rows": "Rows:",
   "results.null": "NULL",
+  "results.dismissError": "Click to dismiss",
   "export.title": "Export rows",
   "export.currentPage": "Current page ({count})",
   "export.allRows": "All rows",

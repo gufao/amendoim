@@ -113,6 +113,9 @@ export const exportCsv = (
 ) =>
   invoke<string>("export_csv", { sql, limit, offset, includeHeader });
 
+export const saveTextFile = (path: string, content: string) =>
+  invoke<number>("save_text_file", { path, content });
+
 export const cancelQuery = () =>
   invoke<void>("cancel_query");
 

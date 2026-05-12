@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { X, Copy, Check, Download, Power, PowerOff } from "lucide-react";
+import { writeText as clipboardWriteText } from "@tauri-apps/plugin-clipboard-manager";
 import { useMcpStore } from "../../stores/mcpStore";
 import { useT } from "../../i18n";
 
@@ -71,7 +72,7 @@ export function McpModal({ onClose }: McpModalProps) {
   }, [copiedId]);
 
   const handleCopy = (id: string, text: string) => {
-    navigator.clipboard.writeText(text);
+    clipboardWriteText(text);
     setCopiedId(id);
   };
 

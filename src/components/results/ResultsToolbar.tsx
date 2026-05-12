@@ -10,9 +10,11 @@ import {
   Copy,
   Check,
 } from "lucide-react";
+import { save } from "@tauri-apps/plugin-dialog";
+import { writeText as clipboardWriteText } from "@tauri-apps/plugin-clipboard-manager";
 import { useToolbarQuery, useResultsQuery } from "../../hooks/useQuery";
 import { useT } from "../../i18n";
-import { exportCsv, executeQuery as runQuery } from "../../lib/tauri";
+import { exportCsv, executeQuery as runQuery, saveTextFile } from "../../lib/tauri";
 import { generateInsertStatements, inferTableFromSql, formatRowCount } from "../../lib/format";
 
 function stripPaginationClauses(sql: string): string {
@@ -45,6 +47,7 @@ export function ResultsToolbar() {
   const [exporting, setExporting] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [includeHeader, setIncludeHeader] = useState(true);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const [insertMenuOpen, setInsertMenuOpen] = useState(false);
   const [insertTarget, setInsertTarget] = useState<{ schema: string; table: string }>({
@@ -128,21 +131,30 @@ export function ResultsToolbar() {
   const runExport = async (scope: "page" | "all") => {
     if (!sql.trim()) return;
     setExportMenuOpen(false);
+    setExportError(null);
+
+    const defaultName = `${title || "query"}_results${scope === "all" ? "_all" : ""}.csv`;
+    let targetPath: string | null;
+    try {
+      targetPath = await save({
+        defaultPath: defaultName,
+        filters: [{ name: "CSV", extensions: ["csv"] }],
+      });
+    } catch (e) {
+      setExportError(String(e));
+      return;
+    }
+    if (!targetPath) return; // user cancelled
+
     setExporting(true);
     try {
       const sqlToRun = scope === "all" ? stripPaginationClauses(sql) : sql;
       const limit = scope === "page" ? pageSize : undefined;
       const offset = scope === "page" ? page * pageSize : undefined;
       const csv = await exportCsv(sqlToRun, limit, offset, includeHeader);
-      const blob = new Blob([csv], { type: "text/csv" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${title || "query"}_results${scope === "all" ? "_all" : ""}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      // Error handling
+      await saveTextFile(targetPath, csv);
+    } catch (e) {
+      setExportError(String(e));
     } finally {
       setExporting(false);
     }
@@ -166,7 +178,7 @@ export function ResultsToolbar() {
         insertTarget.schema,
         insertTarget.table || "<table>"
       );
-      await navigator.clipboard.writeText(text);
+      await clipboardWriteText(text);
       setInsertCopied(scope);
       setTimeout(() => setInsertCopied(null), 1800);
     } catch (e) {
@@ -373,6 +385,16 @@ export function ResultsToolbar() {
 
         {saveError && (
           <span className="ml-2 text-error text-[10px]">{saveError}</span>
+        )}
+
+        {exportError && (
+          <button
+            onClick={() => setExportError(null)}
+            title={t("results.dismissError")}
+            className="ml-2 text-error text-[10px] max-w-[300px] truncate hover:underline"
+          >
+            {exportError}
+          </button>
         )}
       </div>
 

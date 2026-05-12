@@ -116,6 +116,14 @@ pub async fn export_csv(
 }
 
 #[tauri::command]
+pub async fn save_text_file(path: String, content: String) -> Result<u64, String> {
+    let bytes = content.into_bytes();
+    let len = bytes.len() as u64;
+    std::fs::write(&path, &bytes).map_err(|e| format!("Failed to write file '{}': {}", path, e))?;
+    Ok(len)
+}
+
+#[tauri::command]
 pub async fn cancel_query(
     state: State<'_, SharedConnectionManager>,
     pids: State<'_, ActiveQueryPids>,
