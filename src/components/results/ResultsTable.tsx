@@ -8,7 +8,8 @@ import {
   type ColumnDef,
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ArrowUpDown, ArrowUp, ArrowDown, TableProperties, Loader2 } from "lucide-react";
+import { ArrowUpDown, ArrowUp, ArrowDown, TableProperties, Loader2, Check } from "lucide-react";
+import { writeText as clipboardWriteText } from "@tauri-apps/plugin-clipboard-manager";
 import { useResultsQuery } from "../../hooks/useQuery";
 import { useSchemaStore } from "../../stores/schemaStore";
 import { useT } from "../../i18n";
@@ -17,6 +18,13 @@ import { FilterBar } from "./FilterBar";
 import { ResultsToolbar } from "./ResultsToolbar";
 import { RowDetail } from "./RowDetail";
 import { InlineEdit } from "./InlineEdit";
+
+function tsvEscape(s: string): string {
+  if (s.includes("\t") || s.includes("\n") || s.includes("\r") || s.includes('"')) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
 
 const ROW_HEIGHT = 30;
 
@@ -39,6 +47,9 @@ export function ResultsTable() {
     rowIndex: number;
     column: string;
   } | null>(null);
+  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
+  const [selectionAnchor, setSelectionAnchor] = useState<number | null>(null);
+  const [copyToast, setCopyToast] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const isEditable = !!tableContext;
@@ -56,17 +67,30 @@ export function ResultsTable() {
   );
 
   useEffect(() => {
+    setSelectedRows(new Set());
+    setSelectionAnchor(null);
+  }, [result]);
+
+  useEffect(() => {
     if (selectedRowIndex === null || !result) return;
     const handler = (e: KeyboardEvent) => {
       if (editingCell) return;
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        setSelectedRowIndex(Math.min(selectedRowIndex + 1, result.rows.length - 1));
+        const next = Math.min(selectedRowIndex + 1, result.rows.length - 1);
+        setSelectedRowIndex(next);
+        setSelectedRows(new Set([next]));
+        setSelectionAnchor(next);
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
-        setSelectedRowIndex(Math.max(selectedRowIndex - 1, 0));
+        const next = Math.max(selectedRowIndex - 1, 0);
+        setSelectedRowIndex(next);
+        setSelectedRows(new Set([next]));
+        setSelectionAnchor(next);
       } else if (e.key === "Escape") {
         setSelectedRowIndex(null);
+        setSelectedRows(new Set());
+        setSelectionAnchor(null);
       }
     };
     window.addEventListener("keydown", handler);
@@ -74,12 +98,107 @@ export function ResultsTable() {
   }, [selectedRowIndex, result, editingCell, setSelectedRowIndex]);
 
   const handleRowClick = useCallback(
-    (rowIndex: number) => {
-      setSelectedRowIndex(rowIndex);
-      setEditingCell(null);
+    (rowIndex: number, event: React.MouseEvent) => {
+      const isShift = event.shiftKey;
+      const isMeta = event.metaKey || event.ctrlKey;
+
+      if (isShift && selectionAnchor !== null) {
+        // Range select — extend from anchor to the clicked row
+        const min = Math.min(selectionAnchor, rowIndex);
+        const max = Math.max(selectionAnchor, rowIndex);
+        const next = new Set<number>();
+        for (let i = min; i <= max; i++) next.add(i);
+        setSelectedRows(next);
+        // Multi-row → close the detail pane (it only makes sense for a single row)
+        setSelectedRowIndex(null);
+        setEditingCell(null);
+        // Prevent the browser from creating a native text selection on shift-click
+        window.getSelection()?.removeAllRanges();
+      } else if (isMeta) {
+        const next = new Set(selectedRows);
+        if (next.has(rowIndex)) next.delete(rowIndex);
+        else next.add(rowIndex);
+        setSelectedRows(next);
+        setSelectionAnchor(rowIndex);
+        setSelectedRowIndex(next.size === 1 ? Array.from(next)[0] : null);
+        setEditingCell(null);
+      } else {
+        // Plain click: single selection, opens detail pane
+        setSelectedRows(new Set([rowIndex]));
+        setSelectionAnchor(rowIndex);
+        setSelectedRowIndex(rowIndex);
+        setEditingCell(null);
+      }
     },
-    [setSelectedRowIndex]
+    [selectedRows, selectionAnchor, setSelectedRowIndex]
   );
+
+  // Cmd/Ctrl+C → copy selected rows as TSV (header + data, full values).
+  // Falls through to native browser copy when the user has a text selection
+  // or focus is inside an input/editor.
+  useEffect(() => {
+    const handler = async (e: KeyboardEvent) => {
+      const isMeta = e.metaKey || e.ctrlKey;
+      if (!isMeta || (e.key !== "c" && e.key !== "C")) return;
+      if (selectedRows.size === 0 || !result) return;
+
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || target?.isContentEditable) return;
+
+      const textSel = window.getSelection()?.toString() ?? "";
+      if (textSel.length > 0) return;
+
+      e.preventDefault();
+
+      const indices = Array.from(selectedRows).sort((a, b) => a - b);
+      const cols = result.columns;
+      const lines: string[] = [];
+      lines.push(cols.map((c) => tsvEscape(c.name)).join("\t"));
+      for (const i of indices) {
+        const row = result.rows[i];
+        if (!row) continue;
+        lines.push(cols.map((c) => tsvEscape(formatCellValue(row[c.name]))).join("\t"));
+      }
+
+      try {
+        await clipboardWriteText(lines.join("\n"));
+        setCopyToast(indices.length);
+      } catch {
+        // Best-effort; native plugin should not fail under normal conditions
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [selectedRows, result]);
+
+  // Cmd/Ctrl+A → select all rows on the current page
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const isMeta = e.metaKey || e.ctrlKey;
+      if (!isMeta || (e.key !== "a" && e.key !== "A")) return;
+      if (!result || result.rows.length === 0) return;
+
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || target?.isContentEditable) return;
+
+      e.preventDefault();
+      const all = new Set<number>();
+      for (let i = 0; i < result.rows.length; i++) all.add(i);
+      setSelectedRows(all);
+      setSelectionAnchor(0);
+      setSelectedRowIndex(null);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [result, setSelectedRowIndex]);
+
+  useEffect(() => {
+    if (copyToast === null) return;
+    const timer = setTimeout(() => setCopyToast(null), 1800);
+    return () => clearTimeout(timer);
+  }, [copyToast]);
 
   const handleCellDoubleClick = useCallback(
     (rowIndex: number, column: string) => {
@@ -258,7 +377,7 @@ export function ResultsTable() {
   }
 
   return (
-    <div className="flex flex-col h-full bg-bg-primary">
+    <div className="flex flex-col h-full bg-bg-primary relative">
       <FilterBar />
       <ResultsToolbar />
 
@@ -338,16 +457,18 @@ export function ResultsTable() {
                 {virtualItems.map((virtualRow) => {
                   const row = rows[virtualRow.index];
                   const i = virtualRow.index;
-                  const isSelected = i === selectedRowIndex;
+                  const isFocused = i === selectedRowIndex;
+                  const isInRange = selectedRows.has(i);
+                  const isSelected = isFocused || isInRange;
                   return (
                     <tr
                       key={row.id}
-                      className={`border-b border-border-subtle transition-colors cursor-pointer ${
+                      className={`border-b border-border-subtle transition-colors cursor-pointer select-none ${
                         isSelected
                           ? "bg-accent/10 border-l-2 border-l-accent"
                           : "hover:bg-bg-hover/50"
                       }`}
-                      onClick={() => handleRowClick(i)}
+                      onClick={(e) => handleRowClick(i, e)}
                     >
                       <td className="px-3 py-[6px] text-right text-text-faint text-[10px] bg-bg-surface border-r border-border-subtle">
                         {(page || 0) * (pageSize || 100) + i + 1}
@@ -399,6 +520,21 @@ export function ResultsTable() {
         </div>
       )}
 
+      {selectedRows.size > 1 && copyToast === null && (
+        <div className="absolute bottom-3 left-3 z-30 flex items-center gap-2 px-3 py-1.5 rounded-md bg-bg-elevated border border-border shadow-lg shadow-black/30 text-[11px] text-text-secondary animate-fade-in">
+          <span className="font-medium text-accent tabular-nums">{selectedRows.size}</span>
+          <span>{t("results.rowsSelected")}</span>
+          <span className="text-text-faint">·</span>
+          <span className="text-text-faint">{t("results.copyHint")}</span>
+        </div>
+      )}
+
+      {copyToast !== null && (
+        <div className="absolute bottom-3 left-3 z-30 flex items-center gap-2 px-3 py-1.5 rounded-md bg-bg-elevated border border-success/40 shadow-lg shadow-black/30 text-[11px] text-success animate-fade-in">
+          <Check size={12} />
+          <span>{t("results.copiedRows", { count: copyToast })}</span>
+        </div>
+      )}
     </div>
   );
 }
