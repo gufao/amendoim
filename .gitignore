@@ -53,3 +53,6 @@ test-mcp.sh
 # Docs (specs/plans)
 docs/
 .superpowers/
+
+# Claude Code local state
+.claude/
