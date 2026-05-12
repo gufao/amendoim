@@ -77,6 +77,7 @@ export const en: Record<TranslationKey, string> = {
   "results.rowsSelected": "rows selected",
   "results.copyHint": "⌘C to copy (TSV)",
   "results.copiedRows": "{count} rows copied",
+  "results.selectAll": "Select all rows (⌘A)",
   "export.title": "Export rows",
   "export.currentPage": "Current page ({count})",
   "export.allRows": "All rows",

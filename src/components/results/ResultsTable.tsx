@@ -208,6 +208,22 @@ export function ResultsTable() {
     [isEditable]
   );
 
+  const handleSelectAllClick = useCallback(() => {
+    if (!result || result.rows.length === 0) return;
+    const allSelected = selectedRows.size === result.rows.length;
+    if (allSelected) {
+      setSelectedRows(new Set());
+      setSelectionAnchor(null);
+      setSelectedRowIndex(null);
+    } else {
+      const all = new Set<number>();
+      for (let i = 0; i < result.rows.length; i++) all.add(i);
+      setSelectedRows(all);
+      setSelectionAnchor(0);
+      setSelectedRowIndex(null);
+    }
+  }, [result, selectedRows.size, setSelectedRowIndex]);
+
   const handleInlineEditSave = useCallback(
     (rowIndex: number, column: string, newValue: unknown) => {
       updateCellValue(rowIndex, column, newValue);
@@ -409,7 +425,15 @@ export function ResultsTable() {
               <thead className="sticky top-0 z-10">
                 {table.getHeaderGroups().map((headerGroup) => (
                   <tr key={headerGroup.id}>
-                    <th className="bg-bg-tertiary border-b border-border px-3 py-2 text-right font-medium text-text-faint w-12 text-[10px]">
+                    <th
+                      onClick={handleSelectAllClick}
+                      title={t("results.selectAll")}
+                      className={`bg-bg-tertiary border-b border-border px-3 py-2 text-right font-medium w-12 text-[10px] cursor-pointer hover:bg-bg-hover transition-colors select-none ${
+                        result && selectedRows.size === result.rows.length && result.rows.length > 0
+                          ? "text-accent"
+                          : "text-text-faint hover:text-text-secondary"
+                      }`}
+                    >
                       #
                     </th>
                     {headerGroup.headers.map((header) => (

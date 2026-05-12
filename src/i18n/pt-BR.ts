@@ -75,6 +75,7 @@ export const ptBR = {
   "results.rowsSelected": "linhas selecionadas",
   "results.copyHint": "⌘C copia (TSV)",
   "results.copiedRows": "{count} linhas copiadas",
+  "results.selectAll": "Selecionar todas as linhas (⌘A)",
   "export.title": "Exportar linhas",
   "export.currentPage": "Página atual ({count})",
   "export.allRows": "Todas as linhas",
