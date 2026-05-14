@@ -12,6 +12,8 @@ export const ptBR = {
   "sidebar.connections": "Conexões",
   "sidebar.newConnection": "Nova Conexão",
   "sidebar.resize": "Arraste para redimensionar (duplo clique para padrão)",
+  "sidebar.searchTables": "Buscar tabela...",
+  "sidebar.clearSearch": "Limpar busca",
 
   // Connection
   "connection.new": "Nova Conexão",
@@ -37,6 +39,7 @@ export const ptBR = {
 
   // Schema
   "schema.noSchemas": "Nenhum schema encontrado",
+  "schema.noMatches": "Nenhuma tabela encontrada",
   "schema.browser": "Schema",
 
   // Table Info

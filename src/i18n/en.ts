@@ -14,6 +14,8 @@ export const en: Record<TranslationKey, string> = {
   "sidebar.connections": "Connections",
   "sidebar.newConnection": "New Connection",
   "sidebar.resize": "Drag to resize (double-click to reset)",
+  "sidebar.searchTables": "Search tables...",
+  "sidebar.clearSearch": "Clear search",
 
   // Connection
   "connection.new": "New Connection",
@@ -39,6 +41,7 @@ export const en: Record<TranslationKey, string> = {
 
   // Schema
   "schema.noSchemas": "No schemas found",
+  "schema.noMatches": "No matching tables",
   "schema.browser": "Schema",
 
   // Table Info

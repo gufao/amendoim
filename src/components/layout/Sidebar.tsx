@@ -6,6 +6,7 @@ import {
   PanelLeftOpen,
   Search,
   FileCode2,
+  X,
 } from "lucide-react";
 import { ConnectionList } from "../connection/ConnectionList";
 import { SchemaTree } from "../schema/SchemaTree";
@@ -43,6 +44,7 @@ export function Sidebar({ onNewConnection, onEditConnection }: Props) {
   const t = useT();
   const [collapsed, setCollapsed] = useState(false);
   const [width, setWidth] = useState<number>(readStoredWidth);
+  const [tableFilter, setTableFilter] = useState("");
   const activeConnectionId = useConnectionStore((s) => s.activeConnectionId);
   const connections = useConnectionStore((s) => s.connections);
   const activeConn = connections.find((c) => c.id === activeConnectionId);
@@ -170,10 +172,37 @@ export function Sidebar({ onNewConnection, onEditConnection }: Props) {
                 {activeConn?.database || t("schema.browser")}
               </span>
             </div>
-            <SchemaTree />
+            <SchemaTree tableFilter={tableFilter} />
           </div>
         )}
       </div>
+
+      {activeConnectionId && (
+        <div className="border-t border-border bg-bg-secondary shrink-0 px-2 py-2">
+          <div className="relative">
+            <Search
+              size={12}
+              className="absolute left-2 top-1/2 -translate-y-1/2 text-text-faint pointer-events-none"
+            />
+            <input
+              type="text"
+              value={tableFilter}
+              onChange={(e) => setTableFilter(e.target.value)}
+              placeholder={t("sidebar.searchTables")}
+              className="w-full bg-bg-primary border border-border rounded-md pl-7 pr-7 py-1.5 text-xs text-text-primary placeholder:text-text-faint focus:outline-none focus:border-accent transition-colors"
+            />
+            {tableFilter && (
+              <button
+                onClick={() => setTableFilter("")}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-bg-hover text-text-faint hover:text-text-secondary transition-colors"
+                title={t("sidebar.clearSearch")}
+              >
+                <X size={11} />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       <div
         onMouseDown={handleResizeStart}

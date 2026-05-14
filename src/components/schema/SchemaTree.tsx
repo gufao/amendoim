@@ -1,3 +1,4 @@
+import { useEffect, useMemo } from "react";
 import {
   ChevronRight,
   ChevronDown,
@@ -8,6 +9,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useSchema } from "../../hooks/useSchema";
+import { useSchemaStore } from "../../stores/schemaStore";
 import { useQueryStore } from "../../stores/queryStore";
 import { useT } from "../../i18n";
 
@@ -25,7 +27,11 @@ function abbreviateType(type: string): string {
   return TYPE_ABBREVIATIONS[type] ?? type;
 }
 
-export function SchemaTree() {
+interface Props {
+  tableFilter?: string;
+}
+
+export function SchemaTree({ tableFilter = "" }: Props) {
   const {
     schemas,
     tables,
@@ -40,6 +46,39 @@ export function SchemaTree() {
 
   const previewTable = useQueryStore((s) => s.previewTable);
   const t = useT();
+  const trimmedFilter = tableFilter.trim().toLowerCase();
+  const isFiltering = trimmedFilter.length > 0;
+
+  // When the user starts searching, eagerly load tables for any schemas
+  // we haven't fetched yet so the filter can match across all of them.
+  useEffect(() => {
+    if (!isFiltering) return;
+    const loadTables = useSchemaStore.getState().loadTables;
+    for (const schema of schemas) {
+      if (!tables[schema.name]) {
+        loadTables(schema.name);
+      }
+    }
+  }, [isFiltering, schemas, tables]);
+
+  const filteredSchemas = useMemo(() => {
+    if (!isFiltering) {
+      return schemas.map((schema) => ({
+        schema,
+        visibleTables: tables[schema.name] || [],
+        hasMatch: true,
+      }));
+    }
+    return schemas
+      .map((schema) => {
+        const all = tables[schema.name] || [];
+        const visibleTables = all.filter((tbl) =>
+          tbl.name.toLowerCase().includes(trimmedFilter),
+        );
+        return { schema, visibleTables, hasMatch: visibleTables.length > 0 };
+      })
+      .filter((entry) => entry.hasMatch);
+  }, [isFiltering, schemas, tables, trimmedFilter]);
 
   const handleTableClick = (schema: string, table: string) => {
     selectTable(schema, table);
@@ -62,33 +101,42 @@ export function SchemaTree() {
     );
   }
 
+  if (isFiltering && filteredSchemas.length === 0) {
+    return (
+      <div className="px-3 py-6 text-xs text-text-faint text-center">
+        {t("schema.noMatches")}
+      </div>
+    );
+  }
+
   return (
     <div className="text-xs select-none pb-4">
-      {schemas.map((schema) => {
-        const isExpanded = expandedSchemas.has(schema.name);
-        const schemaTables = tables[schema.name] || [];
+      {filteredSchemas.map(({ schema, visibleTables }) => {
+        const isExpanded = isFiltering || expandedSchemas.has(schema.name);
 
         return (
           <div key={schema.name}>
             <div
               className="flex items-center gap-1.5 px-3 py-[5px] cursor-pointer hover:bg-bg-hover transition-colors"
-              onClick={() => toggleSchema(schema.name)}
+              onClick={() => {
+                if (!isFiltering) toggleSchema(schema.name);
+              }}
             >
               <span className="text-text-faint w-3.5 flex items-center justify-center">
                 {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
               </span>
               <Layers size={12} className="text-schema-icon shrink-0" />
               <span className="truncate font-medium text-text-secondary" title={schema.name}>{schema.name}</span>
-              {schemaTables.length > 0 && (
+              {visibleTables.length > 0 && (
                 <span className="text-text-faint ml-auto text-[10px] tabular-nums">
-                  {schemaTables.length}
+                  {visibleTables.length}
                 </span>
               )}
             </div>
 
             {isExpanded && (
               <div className="animate-slide-in">
-                {schemaTables.map((table) => {
+                {visibleTables.map((table) => {
                   const tableKey = `${schema.name}.${table.name}`;
                   const isTableExpanded = expandedTables.has(tableKey);
                   const tableCols = columns[tableKey] || [];
