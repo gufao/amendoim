@@ -55,6 +55,8 @@ export function useResultsQuery() {
   const pageSize = useQueryStore((s) => s.pageSize);
   const updateCellValue = useQueryStore((s) => s.updateCellValue);
   const setSelectedRowIndex = useQueryStore((s) => s.setSelectedRowIndex);
+  const sort = useQueryStore((s) => s.sort);
+  const setSort = useQueryStore((s) => s.setSort);
 
   return {
     result,
@@ -67,6 +69,8 @@ export function useResultsQuery() {
     pageSize,
     updateCellValue,
     setSelectedRowIndex,
+    sort,
+    setSort,
   };
 }
 

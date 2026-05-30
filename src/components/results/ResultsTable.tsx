@@ -2,7 +2,6 @@ import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import {
   useReactTable,
   getCoreRowModel,
-  getSortedRowModel,
   flexRender,
   type SortingState,
   type ColumnDef,
@@ -40,9 +39,26 @@ export function ResultsTable() {
     pageSize,
     updateCellValue,
     setSelectedRowIndex,
+    sort,
+    setSort,
   } = useResultsQuery();
   const t = useT();
-  const [sorting, setSorting] = useState<SortingState>([]);
+  const sorting: SortingState = useMemo(
+    () => (sort ? [{ id: sort.column, desc: sort.direction === "desc" }] : []),
+    [sort]
+  );
+  const onSortingChange = useCallback(
+    (updater: SortingState | ((old: SortingState) => SortingState)) => {
+      const next = typeof updater === "function" ? updater(sorting) : updater;
+      if (next.length === 0) {
+        setSort(null);
+      } else {
+        const s = next[0];
+        setSort({ column: s.id, direction: s.desc ? "desc" : "asc" });
+      }
+    },
+    [setSort, sorting]
+  );
   const [editingCell, setEditingCell] = useState<{
     rowIndex: number;
     column: string;
@@ -296,9 +312,9 @@ export function ResultsTable() {
     data,
     columns,
     state: { sorting },
-    onSortingChange: setSorting,
+    onSortingChange,
+    manualSorting: true,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
     columnResizeMode: "onChange",
   });
 

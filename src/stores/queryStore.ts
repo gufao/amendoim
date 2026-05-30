@@ -155,6 +155,7 @@ interface QueryState {
   pageSize: number;
   tableContext: { schema: string; table: string } | null;
   filters: Filter[];
+  sort: SortSpec | null;
   pendingChanges: Record<number, Record<string, unknown>>;
   selectedRowIndex: number | null;
 
@@ -170,6 +171,7 @@ interface QueryState {
   updateFilter: (filterId: string, updates: Partial<Filter>) => void;
   removeFilter: (filterId: string) => void;
   applyFilters: (opts?: { resetPage?: boolean }) => Promise<void>;
+  setSort: (sort: SortSpec | null) => void;
   setPage: (page: number) => void;
   setPageSize: (pageSize: number) => void;
   updateCellValue: (rowIndex: number, column: string, value: unknown) => void;
@@ -213,13 +215,19 @@ export function buildFilterClause(f: Filter, allColumns?: string[]): string {
   return `"${f.column}" ${f.operator} '${escaped}'`;
 }
 
+export interface SortSpec {
+  column: string;
+  direction: "asc" | "desc";
+}
+
 export function buildFilteredSql(
   schema: string,
   table: string,
   filters: Filter[],
   limit: number,
   allColumns: string[],
-  offset?: number
+  offset?: number,
+  sort?: SortSpec | null
 ): string {
   const activeFilters = filters.filter((f) => f.enabled && (f.column === ANY_COLUMN_VALUE || f.column));
   let sql = `SELECT * FROM "${schema}"."${table}"`;
@@ -227,6 +235,12 @@ export function buildFilteredSql(
   if (activeFilters.length > 0) {
     const clauses = activeFilters.map((f) => buildFilterClause(f, allColumns));
     sql += ` WHERE ${clauses.join(" AND ")}`;
+  }
+
+  if (sort && sort.column) {
+    const dir = sort.direction === "desc" ? "DESC" : "ASC";
+    // NULLS LAST so users sorting desc don't get a wall of NULLs on top.
+    sql += ` ORDER BY "${sort.column}" ${dir} NULLS LAST`;
   }
 
   sql += ` LIMIT ${limit}`;
@@ -245,6 +259,7 @@ export const useQueryStore = create<QueryState>((set, get) => ({
   pageSize: 100,
   tableContext: null,
   filters: [],
+  sort: null,
   pendingChanges: {},
   selectedRowIndex: null,
 
@@ -259,6 +274,7 @@ export const useQueryStore = create<QueryState>((set, get) => ({
       error: null,
       page: 0,
       filters: [],
+      sort: null,
       pendingChanges: {},
       selectedRowIndex: null,
       tableContext: null,
@@ -361,6 +377,7 @@ export const useQueryStore = create<QueryState>((set, get) => ({
       activeView: "data",
       tableContext: { schema, table },
       filters: initialFilters,
+      sort: null,
       pendingChanges: {},
       selectedRowIndex: null,
       page: initialPage,
@@ -390,6 +407,28 @@ export const useQueryStore = create<QueryState>((set, get) => ({
     const { schema, table } = state.tableContext;
     const initialConnId = getActiveConnectionIdSync();
     const offset = state.page * state.pageSize;
+
+    // Sort active but no filters: the fast preview_table backend path doesn't
+    // support ORDER BY, so build the SQL here. Carry over the prior total
+    // (no filter = full-table count is unchanged) to keep the row counter accurate.
+    if (state.sort) {
+      const sql = buildFilteredSql(schema, table, [], state.pageSize, [], offset, state.sort);
+      const priorTotal = state.result?.total_rows ?? null;
+      const priorEstimated = state.result?.total_rows_estimated ?? false;
+      set({ sql, isExecuting: true, error: null, selectedRowIndex: null });
+      try {
+        const result = await api.executeQuery(sql, undefined, undefined);
+        if (!isStillCurrent(initialConnId, schema, table)) return;
+        result.total_rows = priorTotal;
+        result.total_rows_estimated = priorEstimated;
+        set({ result, isExecuting: false });
+      } catch (e) {
+        if (!isStillCurrent(initialConnId, schema, table)) return;
+        set({ error: String(e), isExecuting: false });
+      }
+      return;
+    }
+
     set({
       isExecuting: true,
       error: null,
@@ -464,7 +503,7 @@ export const useQueryStore = create<QueryState>((set, get) => ({
     const page = resetPage ? 0 : state.page;
     const offset = page * state.pageSize;
     const allColumns = state.result?.columns.map((c) => c.name) || [];
-    const sql = buildFilteredSql(schema, table, state.filters, state.pageSize, allColumns, offset);
+    const sql = buildFilteredSql(schema, table, state.filters, state.pageSize, allColumns, offset, state.sort);
 
     set({ sql, page, isExecuting: true, error: null, selectedRowIndex: null });
 
@@ -483,6 +522,23 @@ export const useQueryStore = create<QueryState>((set, get) => ({
     } catch (e) {
       if (!isStillCurrent(initialConnId, schema, table)) return;
       set({ error: String(e), isExecuting: false });
+    }
+  },
+
+  setSort: (sort) => {
+    const prev = get().sort;
+    const same =
+      (prev === null && sort === null) ||
+      (prev !== null && sort !== null && prev.column === sort.column && prev.direction === sort.direction);
+    if (same) return;
+    set({ sort, page: 0, selectedRowIndex: null });
+    const state = get();
+    if (!state.tableContext) return;
+    const hasActiveFilters = state.filters.some((f) => f.enabled && (f.column === ANY_COLUMN_VALUE || f.column));
+    if (hasActiveFilters) {
+      get().applyFilters({ resetPage: true });
+    } else {
+      get().fetchPreviewPage();
     }
   },
 
