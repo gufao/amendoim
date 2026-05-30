@@ -54,9 +54,15 @@ async fn execute_query_inner(
     offset: Option<i64>,
     start: Instant,
 ) -> Result<QueryResult, String> {
-    // For SELECT queries, wrap with limit/offset if not already present
-    let sql_upper = sql.trim().to_uppercase();
-    let is_select = sql_upper.starts_with("SELECT") || sql_upper.starts_with("WITH");
+    // For SELECT queries, wrap with limit/offset if not already present.
+    // Strip leading whitespace AND leading comments before classifying — a
+    // `-- comment` or `/* comment */` on the line above a SELECT/WITH must not
+    // demote the query to the "DML" branch (which would lose the result set
+    // and report `rows_affected` instead).
+    let body = strip_leading_ws_and_comments(sql);
+    let body_upper = body.to_uppercase();
+    let is_select = body_upper.starts_with("SELECT") || body_upper.starts_with("WITH");
+    let sql_upper = sql.to_uppercase();
 
     let final_sql = if is_select && limit.is_some() {
         let has_limit = sql_upper.contains(" LIMIT ");
@@ -168,6 +174,49 @@ pub async fn cancel_query(
         .map_err(|e| format!("Failed to cancel query: {}", e))?;
 
     Ok(())
+}
+
+/// Return the substring of `sql` after skipping all leading whitespace and
+/// SQL comments (line `-- ...\n` and block `/* ... */`, nested). Used to
+/// classify a query as SELECT/WITH vs DML when the user wrote header comments
+/// above their query.
+fn strip_leading_ws_and_comments(sql: &str) -> &str {
+    let bytes = sql.as_bytes();
+    let n = bytes.len();
+    let mut i = 0;
+    loop {
+        // whitespace
+        while i < n && bytes[i].is_ascii_whitespace() {
+            i += 1;
+        }
+        // line comment
+        if i + 1 < n && bytes[i] == b'-' && bytes[i + 1] == b'-' {
+            i += 2;
+            while i < n && bytes[i] != b'\n' {
+                i += 1;
+            }
+            continue;
+        }
+        // block comment (nested)
+        if i + 1 < n && bytes[i] == b'/' && bytes[i + 1] == b'*' {
+            let mut depth: u32 = 1;
+            i += 2;
+            while i < n && depth > 0 {
+                if i + 1 < n && bytes[i] == b'/' && bytes[i + 1] == b'*' {
+                    depth += 1;
+                    i += 2;
+                } else if i + 1 < n && bytes[i] == b'*' && bytes[i + 1] == b'/' {
+                    depth -= 1;
+                    i += 2;
+                } else {
+                    i += 1;
+                }
+            }
+            continue;
+        }
+        break;
+    }
+    &sql[i..]
 }
 
 /// Split a SQL string into individual statements at top-level semicolons,
@@ -372,6 +421,15 @@ fn pg_value_to_json(row: &sqlx::postgres::PgRow, ordinal: usize, type_name: &str
             .and_then(|v| serde_json::Number::from_f64(v))
             .map(serde_json::Value::Number)
             .unwrap_or(serde_json::Value::Null),
+        // NUMERIC has arbitrary precision — represent as a string to preserve
+        // every digit. Without this branch every NUMERIC column (including
+        // round(avg(...)::numeric, N) aggregate results) silently collapsed to
+        // NULL because the fallback's try_get::<String> can't decode NUMERIC.
+        "NUMERIC" => row
+            .try_get::<bigdecimal::BigDecimal, _>(ordinal)
+            .ok()
+            .map(|v| serde_json::Value::String(v.to_string()))
+            .unwrap_or(serde_json::Value::Null),
         "JSON" | "JSONB" => row
             .try_get::<serde_json::Value, _>(ordinal)
             .unwrap_or(serde_json::Value::Null),
@@ -410,7 +468,90 @@ fn pg_value_to_json(row: &sqlx::postgres::PgRow, ordinal: usize, type_name: &str
 
 #[cfg(test)]
 mod tests {
-    use super::split_sql_statements;
+    use super::{split_sql_statements, strip_leading_ws_and_comments};
+
+    fn classify_is_select(sql: &str) -> bool {
+        let body = strip_leading_ws_and_comments(sql).to_uppercase();
+        body.starts_with("SELECT") || body.starts_with("WITH")
+    }
+
+    #[test]
+    fn strip_handles_no_leading_anything() {
+        assert_eq!(strip_leading_ws_and_comments("SELECT 1"), "SELECT 1");
+    }
+
+    #[test]
+    fn strip_handles_leading_whitespace() {
+        assert_eq!(strip_leading_ws_and_comments("   \n\tSELECT 1"), "SELECT 1");
+    }
+
+    #[test]
+    fn strip_handles_line_comment() {
+        assert_eq!(
+            strip_leading_ws_and_comments("-- a comment\nSELECT 1"),
+            "SELECT 1"
+        );
+    }
+
+    #[test]
+    fn strip_handles_block_comment() {
+        assert_eq!(
+            strip_leading_ws_and_comments("/* hello */ SELECT 1"),
+            "SELECT 1"
+        );
+    }
+
+    #[test]
+    fn strip_handles_nested_block_comment() {
+        assert_eq!(
+            strip_leading_ws_and_comments("/* outer /* inner */ still outer */ SELECT 1"),
+            "SELECT 1"
+        );
+    }
+
+    #[test]
+    fn strip_handles_multiple_consecutive_comments() {
+        let sql = "-- first\n-- second\n/* third */\n  WITH x AS (SELECT 1) SELECT * FROM x";
+        assert_eq!(
+            strip_leading_ws_and_comments(sql),
+            "WITH x AS (SELECT 1) SELECT * FROM x"
+        );
+    }
+
+    #[test]
+    fn strip_leaves_body_when_no_comments_match() {
+        // A `-` that isn't `--` shouldn't trigger comment-skip.
+        assert_eq!(strip_leading_ws_and_comments("-1 + 2"), "-1 + 2");
+    }
+
+    #[test]
+    fn classify_select_after_line_comment() {
+        // Regression: a leading -- comment used to demote the query to the DML
+        // branch and lose the result set (reported as "X linhas afetadas").
+        assert!(classify_is_select(
+            "-- Export consolidado\n-- another line\nWITH foo AS (SELECT 1)\nSELECT * FROM foo"
+        ));
+    }
+
+    #[test]
+    fn classify_select_after_block_comment() {
+        assert!(classify_is_select("/* header */\nSELECT 1"));
+    }
+
+    #[test]
+    fn classify_select_lowercase_with_comment() {
+        assert!(classify_is_select("-- nope\nselect 1"));
+    }
+
+    #[test]
+    fn classify_not_select_for_insert_with_comment() {
+        assert!(!classify_is_select("-- header\nINSERT INTO t VALUES (1)"));
+    }
+
+    #[test]
+    fn classify_not_select_for_update() {
+        assert!(!classify_is_select("UPDATE t SET x = 1"));
+    }
 
     #[test]
     fn splits_simple_statements() {
