@@ -22,7 +22,7 @@ describe("useQueryFileStore - getNextTitle and addQuery dynamic numbering", () =
     expect(query.title).toBe("SQL Query 3");
   });
 
-  it("should reuse 'SQL Query 1' if it was deleted/not present but higher queries exist", () => {
+  it("should not reuse 'SQL Query 1' if it was deleted/not present but higher queries exist, continuing monotonically", () => {
     const store = useQueryFileStore.getState();
     
     // Manually set state to simulate "SQL Query 2" and "SQL Query 3" being present but no "SQL Query 1"
@@ -34,10 +34,10 @@ describe("useQueryFileStore - getNextTitle and addQuery dynamic numbering", () =
     });
 
     const query = useQueryFileStore.getState().addQuery("conn-1");
-    expect(query.title).toBe("SQL Query 1");
+    expect(query.title).toBe("SQL Query 4");
   });
 
-  it("should fill the gap 'SQL Query 2' if 1 and 3 exist but 2 is missing", () => {
+  it("should not fill the gap 'SQL Query 2' if 1 and 3 exist but 2 is missing, continuing monotonically", () => {
     useQueryFileStore.setState({
       queries: [
         { id: "q1", title: "SQL Query 1", sql: "", connectionId: "conn-1", createdAt: 0, updatedAt: 0 },
@@ -46,7 +46,7 @@ describe("useQueryFileStore - getNextTitle and addQuery dynamic numbering", () =
     });
 
     const query = useQueryFileStore.getState().addQuery("conn-1");
-    expect(query.title).toBe("SQL Query 2");
+    expect(query.title).toBe("SQL Query 4");
   });
 
   it("should not be affected by custom query names", () => {

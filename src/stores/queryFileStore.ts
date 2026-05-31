@@ -31,18 +31,17 @@ export const useQueryFileStore = create<QueryFileState>()(
       },
 
       getNextTitle: () => {
-        const existingNumbers = new Set<number>();
+        let maxNum = 0;
         get().queries.forEach((q) => {
           const match = q.title.match(/^SQL Query (\d+)$/);
           if (match) {
-            existingNumbers.add(parseInt(match[1], 10));
+            const num = parseInt(match[1], 10);
+            if (num > maxNum) {
+              maxNum = num;
+            }
           }
         });
-        let n = 1;
-        while (existingNumbers.has(n)) {
-          n++;
-        }
-        return `SQL Query ${n}`;
+        return `SQL Query ${maxNum + 1}`;
       },
 
       addQuery: (connectionId, title, sql) => {

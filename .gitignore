@@ -56,3 +56,7 @@ docs/
 
 # Claude Code local state
 .claude/
+
+# OpenHands memory
+AGENTS.md
+
