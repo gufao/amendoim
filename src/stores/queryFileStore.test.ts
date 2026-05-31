@@ -23,8 +23,6 @@ describe("useQueryFileStore - getNextTitle and addQuery dynamic numbering", () =
   });
 
   it("should not reuse 'SQL Query 1' if it was deleted/not present but higher queries exist, continuing monotonically", () => {
-    const store = useQueryFileStore.getState();
-    
     // Manually set state to simulate "SQL Query 2" and "SQL Query 3" being present but no "SQL Query 1"
     useQueryFileStore.setState({
       queries: [
