@@ -10,8 +10,6 @@ export interface QueryFile {
   updatedAt: number;
 }
 
-let queryCounter = 0;
-
 interface QueryFileState {
   queries: QueryFile[];
   loadQueries: () => void;
@@ -30,17 +28,20 @@ export const useQueryFileStore = create<QueryFileState>()(
 
       loadQueries: () => {
         // Persist middleware handles loading automatically.
-        // Update counter to avoid title collisions.
-        const maxNum = get().queries.reduce((max, q) => {
-          const match = q.title.match(/^SQL Query (\d+)$/);
-          return match ? Math.max(max, parseInt(match[1])) : max;
-        }, 0);
-        queryCounter = maxNum;
       },
 
       getNextTitle: () => {
-        queryCounter++;
-        return `SQL Query ${queryCounter}`;
+        let maxNum = 0;
+        get().queries.forEach((q) => {
+          const match = q.title.match(/^SQL Query (\d+)$/);
+          if (match) {
+            const num = parseInt(match[1], 10);
+            if (num > maxNum) {
+              maxNum = num;
+            }
+          }
+        });
+        return `SQL Query ${maxNum + 1}`;
       },
 
       addQuery: (connectionId, title, sql) => {
