@@ -11,7 +11,9 @@
 <p align="center">
   <a href="https://github.com/gufao/amendoim/releases/latest">Download</a> ·
   <a href="#funcionalidades">Funcionalidades</a> ·
-  <a href="#desenvolvimento">Desenvolvimento</a>
+  <a href="#desenvolvimento">Desenvolvimento</a> ·
+  <a href="ARCHITECTURE.md">Arquitetura</a> ·
+  <a href="CONTRIBUTING.md">Como Contribuir</a>
 </p>
 
 ---
@@ -65,11 +67,19 @@ Ou: clique com o botão direito no app > **Abrir** > **Abrir** novamente no diá
 ## Desenvolvimento
 
 ```bash
-# Pré-requisitos: Node.js 18+, Rust
+# Pré-requisitos: Node.js 18+, pnpm, Rust
 git clone https://github.com/gufao/amendoim.git
 cd amendoim
-npm install
-npx tauri dev
+pnpm install
+pnpm tauri dev
+```
+
+### Executando Testes
+
+Para garantir o bom funcionamento do projeto e evitar regressões, você pode rodar os testes unitários utilizando Vitest:
+
+```bash
+pnpm test
 ```
 
 ### Banco de teste
@@ -85,10 +95,18 @@ Conecte com: `localhost:5432`, user `postgres`, password `postgres`.
 ### Build
 
 ```bash
-npx tauri build
+pnpm tauri build
 ```
 
 O `.dmg` será gerado em `src-tauri/target/release/bundle/dmg/`.
+
+## Arquitetura do Projeto
+
+Para uma visão detalhada de como a aplicação está estruturada, de que forma o Frontend (React) e o Backend (Rust) se comunicam através da API de comandos do Tauri e como o Zustand gerencia o estado da aplicação, confira o nosso guia de [Arquitetura](ARCHITECTURE.md).
+
+## Como Contribuir
+
+Quer ajudar a melhorar o Amendoim? Seja reportando um bug, sugerindo melhorias ou desenvolvendo código, confira as nossas diretrizes de contribuição no guia [Como Contribuir (CONTRIBUTING.md)](CONTRIBUTING.md).
 
 ## Atalhos
 
