@@ -1,14 +1,27 @@
-import Editor, { type OnMount } from "@monaco-editor/react";
+import Editor, { type OnMount, type BeforeMount } from "@monaco-editor/react";
 import { useCallback, useRef, useEffect } from "react";
 import { Play, Square } from "lucide-react";
 import { useEditorQuery } from "../../hooks/useQuery";
 import { useT } from "../../i18n";
 import { setEditorInstance } from "../../lib/editor";
+import { useThemeStore } from "../../stores/themeStore";
+import { MONACO_THEMES, MONACO_THEME_NAMES } from "../../lib/monacoThemes";
 
 export function SqlEditor() {
   const t = useT();
   const { activeQueryId, sql, isExecuting, updateSql, executeActiveQuery } = useEditorQuery();
+  const theme = useThemeStore((s) => s.theme);
+  const monacoTheme = MONACO_THEME_NAMES[theme];
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
+
+  // Register every theme before the editor is created so the initial `theme`
+  // prop resolves. Switching the prop later makes @monaco-editor/react call
+  // setTheme on its own, so the editor re-themes live with the rest of the app.
+  const handleBeforeMount: BeforeMount = useCallback((monaco) => {
+    for (const { name, data } of MONACO_THEMES) {
+      monaco.editor.defineTheme(name, data);
+    }
+  }, []);
 
   useEffect(() => {
     if (!editorRef.current) return;
@@ -24,46 +37,8 @@ export function SqlEditor() {
     editorRef.current = editor;
     setEditorInstance(editor);
 
-    monaco.editor.defineTheme("amendoim-dark", {
-      base: "vs-dark",
-      inherit: true,
-      rules: [
-        { token: "keyword", foreground: "d4aa80", fontStyle: "bold" },
-        { token: "string.sql", foreground: "7ec699" },
-        { token: "string", foreground: "7ec699" },
-        { token: "number", foreground: "e0b44a" },
-        { token: "comment", foreground: "4a433b", fontStyle: "italic" },
-        { token: "operator", foreground: "b0a698" },
-        { token: "predefined", foreground: "8bb5cf" },
-        { token: "type", foreground: "8bb5cf" },
-      ],
-      colors: {
-        "editor.background": "#1a1714",
-        "editor.foreground": "#f5f0eb",
-        "editor.lineHighlightBackground": "#211e1a80",
-        "editor.lineHighlightBorder": "#00000000",
-        "editor.selectionBackground": "#c2956a30",
-        "editor.inactiveSelectionBackground": "#c2956a15",
-        "editorCursor.foreground": "#d4aa80",
-        "editorGutter.background": "#1a1714",
-        "editorLineNumber.foreground": "#4a433b",
-        "editorLineNumber.activeForeground": "#6d6459",
-        "editorIndentGuide.background": "#2e292440",
-        "editorWhitespace.foreground": "#2e292430",
-        "editor.rangeHighlightBackground": "#c2956a08",
-        "editorBracketMatch.background": "#c2956a20",
-        "editorBracketMatch.border": "#c2956a40",
-        "scrollbar.shadow": "#00000000",
-        "editorOverviewRuler.border": "#00000000",
-        "editorWidget.background": "#282420",
-        "editorWidget.border": "#2e2924",
-        "editorSuggestWidget.background": "#282420",
-        "editorSuggestWidget.border": "#2e2924",
-        "editorSuggestWidget.selectedBackground": "#36312b",
-        "list.hoverBackground": "#2e2a25",
-      },
-    });
-    monaco.editor.setTheme("amendoim-dark");
+    // Themes are registered in handleBeforeMount; just select the current one.
+    monaco.editor.setTheme(MONACO_THEME_NAMES[useThemeStore.getState().theme]);
 
     editor.addAction({
       id: "execute-query",
@@ -147,9 +122,10 @@ export function SqlEditor() {
         <Editor
           height="100%"
           language="sql"
-          theme="amendoim-dark"
+          theme={monacoTheme}
           value={sql}
           onChange={(value) => updateSql(value || "")}
+          beforeMount={handleBeforeMount}
           onMount={handleMount}
           loading={
             <div className="flex items-center justify-center h-full bg-bg-secondary text-text-faint text-xs">

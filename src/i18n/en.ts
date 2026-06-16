@@ -189,6 +189,13 @@ export const en: Record<TranslationKey, string> = {
   "feedback.send": "Send",
   "feedback.thanks": "Thanks for your feedback!",
 
+  // Theme
+  "theme.label": "Theme",
+  "theme.terracota": "Terracotta",
+  "theme.rosa-quente": "Warm Pink",
+  "theme.rosa-vibrante": "Vibrant Pink",
+  "theme.rosa-suave": "Soft Pink",
+
   // Connection Tabs
   "tabs.closeTab": "Close connection",
 

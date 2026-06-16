@@ -187,6 +187,13 @@ export const ptBR = {
   "feedback.send": "Enviar",
   "feedback.thanks": "Obrigado pelo feedback!",
 
+  // Theme
+  "theme.label": "Tema",
+  "theme.terracota": "Terracota",
+  "theme.rosa-quente": "Rosa Quente",
+  "theme.rosa-vibrante": "Rosa Vibrante",
+  "theme.rosa-suave": "Rosa Suave",
+
   // Connection Tabs
   "tabs.closeTab": "Fechar conexao",
 

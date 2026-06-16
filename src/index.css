@@ -42,6 +42,127 @@
   --color-pk-icon: #e0b44a;
 }
 
+/*
+ * Theme variants. The `@theme` block above is the default ("terracota").
+ * Each block below re-points the same tokens for an alternate palette; the
+ * `:root[data-theme="…"]` selector (specificity 0,2,0) outranks Tailwind's
+ * `:root` (0,1,0), so the override wins. `data-theme` is set by themeStore.ts.
+ */
+
+/* Rosa Quente — same warm dark base, mauve-rose accent (kin to terracota) */
+:root[data-theme="rosa-quente"] {
+  color-scheme: dark;
+  --color-bg-primary: #15100f;
+  --color-bg-secondary: #1d1614;
+  --color-bg-tertiary: #241b19;
+  --color-bg-elevated: #2b201e;
+  --color-bg-hover: #322523;
+  --color-bg-active: #3a2b29;
+  --color-bg-surface: #1f1816;
+
+  --color-border: #322826;
+  --color-border-subtle: #271f1d;
+  --color-border-focus: #d98aa6;
+
+  --color-text-primary: #f6efec;
+  --color-text-secondary: #b6a39e;
+  --color-text-muted: #6f615c;
+  --color-text-faint: #4d423e;
+
+  --color-accent: #d98aa6;
+  --color-accent-hover: #e6a3bb;
+  --color-accent-muted: #b06f87;
+  --color-accent-subtle: rgba(217, 138, 166, 0.14);
+
+  --color-success: #7ec699;
+  --color-success-muted: rgba(126, 198, 153, 0.15);
+  --color-warning: #e0b44a;
+  --color-warning-muted: rgba(224, 180, 74, 0.15);
+  --color-error: #e08a8a;
+  --color-error-muted: rgba(224, 138, 138, 0.12);
+
+  --color-schema-icon: #d98aa6;
+  --color-table-icon: #cf8bb5;
+  --color-column-icon: #6f615c;
+  --color-pk-icon: #e0b44a;
+}
+
+/* Rosa Vibrante — dark with violet tint, vivid magenta accent */
+:root[data-theme="rosa-vibrante"] {
+  color-scheme: dark;
+  --color-bg-primary: #110d13;
+  --color-bg-secondary: #191320;
+  --color-bg-tertiary: #1f1828;
+  --color-bg-elevated: #271f2c;
+  --color-bg-hover: #2e2433;
+  --color-bg-active: #382c3f;
+  --color-bg-surface: #1b1522;
+
+  --color-border: #2e2433;
+  --color-border-subtle: #231b29;
+  --color-border-focus: #ff6fae;
+
+  --color-text-primary: #f5eef5;
+  --color-text-secondary: #b3a4b6;
+  --color-text-muted: #6d5f72;
+  --color-text-faint: #4a4050;
+
+  --color-accent: #ff6fae;
+  --color-accent-hover: #ff8cc0;
+  --color-accent-muted: #c75688;
+  --color-accent-subtle: rgba(255, 111, 174, 0.15);
+
+  --color-success: #6fd99e;
+  --color-success-muted: rgba(111, 217, 158, 0.15);
+  --color-warning: #e6b84d;
+  --color-warning-muted: rgba(230, 184, 77, 0.15);
+  --color-error: #ff7a8a;
+  --color-error-muted: rgba(255, 122, 138, 0.13);
+
+  --color-schema-icon: #ff6fae;
+  --color-table-icon: #c98bd6;
+  --color-column-icon: #6d5f72;
+  --color-pk-icon: #e6b84d;
+}
+
+/* Rosa Suave — light blush theme */
+:root[data-theme="rosa-suave"] {
+  color-scheme: light;
+  --color-bg-primary: #fdf4f7;
+  --color-bg-secondary: #f7e9ef;
+  --color-bg-tertiary: #f1dde6;
+  --color-bg-elevated: #ffffff;
+  --color-bg-hover: #f3e0e8;
+  --color-bg-active: #ecd3de;
+  --color-bg-surface: #fbeef3;
+
+  --color-border: #f0d7e0;
+  --color-border-subtle: #f6e6ed;
+  --color-border-focus: #d9628a;
+
+  --color-text-primary: #3a2630;
+  --color-text-secondary: #7a5d68;
+  --color-text-muted: #a98c97;
+  --color-text-faint: #c2a6b1;
+
+  --color-accent: #d9628a;
+  --color-accent-hover: #c44e78;
+  --color-accent-muted: #b8466e;
+  --color-accent-subtle: rgba(217, 98, 138, 0.12);
+
+  --color-success: #3aa06a;
+  --color-success-muted: rgba(58, 160, 106, 0.14);
+  --color-warning: #c98a1e;
+  --color-warning-muted: rgba(201, 138, 30, 0.16);
+  --color-error: #d24b5f;
+  --color-error-muted: rgba(210, 75, 95, 0.12);
+
+  --color-schema-icon: #d9628a;
+  --color-table-icon: #b06aa0;
+  --color-column-icon: #a98c97;
+  --color-pk-icon: #c98a1e;
+}
+
 @layer base {
   *, *::before, *::after {
     margin: 0;
@@ -70,9 +191,9 @@
     -webkit-text-fill-color: var(--color-text-primary) !important;
   }
 
-  /* Selection */
+  /* Selection — derived from the active theme's accent */
   ::selection {
-    background: rgba(194, 149, 106, 0.3);
+    background: color-mix(in srgb, var(--color-accent) 30%, transparent);
   }
 }
 
@@ -87,12 +208,12 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--color-text-secondary) 20%, transparent);
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.14);
+  background: color-mix(in srgb, var(--color-text-secondary) 34%, transparent);
 }
 
 ::-webkit-scrollbar-corner {

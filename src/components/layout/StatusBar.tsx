@@ -5,6 +5,7 @@ import { useStatusQuery } from "../../hooks/useQuery";
 import { formatDuration, formatRowCount } from "../../lib/format";
 import { useT, useI18nStore, type Locale } from "../../i18n";
 import { FeedbackButton } from "./FeedbackPopover";
+import { ThemeSwitcher } from "./ThemeSwitcher";
 
 export function StatusBar({
   onOpenMcp,
@@ -101,6 +102,9 @@ export function StatusBar({
 
       {/* Language switcher */}
       <LanguageSwitcher />
+
+      {/* Theme switcher */}
+      <ThemeSwitcher />
     </div>
   );
 }

@@ -48,7 +48,7 @@ export function InlineEdit({ value, onSave, onCancel, onTab }: Props) {
       onChange={(e) => setEditValue(e.target.value)}
       onKeyDown={handleKeyDown}
       onBlur={handleSave}
-      className="w-full bg-bg-primary border-[1.5px] border-accent rounded px-2 py-[3px] text-xs text-text-primary outline-none shadow-[0_0_0_2px_rgba(194,149,106,0.15)]"
+      className="w-full bg-bg-primary border-[1.5px] border-accent rounded px-2 py-[3px] text-xs text-text-primary outline-none shadow-[0_0_0_2px_var(--color-accent-subtle)]"
     />
   );
 }
