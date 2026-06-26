@@ -32,6 +32,7 @@ O nome? O elefante do PostgreSQL adora amendoim.
 - **Filtros Visuais** — filtre dados sem escrever SQL (WHERE clauses via dropdowns)
 - **Preview de Tabela** — clique numa tabela e veja os dados + contagem total instantaneamente
 - **Múltiplas Tabs** — abra várias queries ao mesmo tempo (`Cmd+N` / `Cmd+W`)
+- **Paleta de Comandos** — `Cmd+P` para buscar qualquer tabela pelo nome e abri-la direto numa nova tab
 - **Senhas Seguras** — credenciais armazenadas no macOS Keychain, nunca em texto puro
 - **Atualizações Automáticas** — OTA via GitHub Releases com assinatura criptográfica
 - **Bilíngue** — interface em Português (pt-BR) e Inglês, alternável pelo status bar
@@ -115,6 +116,7 @@ Quer ajudar a melhorar o Amendoim? Seja reportando um bug, sugerindo melhorias o
 | `Cmd+Enter` | Executar query |
 | `Cmd+N` | Nova tab |
 | `Cmd+W` | Fechar tab |
+| `Cmd+P` | Abrir tabela (paleta de comandos) |
 | `Enter` (no filtro) | Aplicar filtros |
 
 ## Licença

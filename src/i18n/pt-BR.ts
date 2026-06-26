@@ -5,6 +5,12 @@ export const ptBR = {
   "app.welcome.newConnection": "Nova Conexão",
   "app.welcome.hint": "Ou selecione uma conexão salva na barra lateral",
 
+  // Command Palette
+  "palette.placeholder": "Buscar tabela para abrir...",
+  "palette.loading": "Carregando tabelas...",
+  "palette.noResults": "Nenhuma tabela encontrada",
+  "palette.hint": "↑↓ navegar · ↵ abrir · esc fechar",
+
   // Sidebar
   "sidebar.expand": "Expandir barra lateral",
   "sidebar.collapse": "Recolher barra lateral",

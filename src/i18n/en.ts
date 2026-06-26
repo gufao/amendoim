@@ -7,6 +7,12 @@ export const en: Record<TranslationKey, string> = {
   "app.welcome.newConnection": "New Connection",
   "app.welcome.hint": "Or select a saved connection from the sidebar",
 
+  // Command Palette
+  "palette.placeholder": "Search for a table to open...",
+  "palette.loading": "Loading tables...",
+  "palette.noResults": "No tables found",
+  "palette.hint": "↑↓ navigate · ↵ open · esc close",
+
   // Sidebar
   "sidebar.expand": "Expand sidebar",
   "sidebar.collapse": "Collapse sidebar",
