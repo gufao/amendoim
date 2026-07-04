@@ -14,6 +14,7 @@ export const ptBR = {
   "sidebar.resize": "Arraste para redimensionar (duplo clique para padrão)",
   "sidebar.searchTables": "Buscar tabela...",
   "sidebar.clearSearch": "Limpar busca",
+  "tableSearch.placeholder": "Buscar nesta tabela...",
 
   // Connection
   "connection.new": "Nova Conexão",

@@ -34,6 +34,30 @@ export const ANY_COLUMN_OPERATORS = [
 
 export const ANY_COLUMN_VALUE = "__any__";
 
+// Reserved filter id backing the dedicated "search this table" box. It's an
+// any-column LIKE filter that rides the normal filter pipeline (SQL build,
+// count, pagination, persistence) but is rendered by <TableSearch/> instead of
+// the FilterBar, so it never shows up twice.
+export const TABLE_SEARCH_FILTER_ID = "__table_search__";
+
+/**
+ * Upserts the reserved table-search filter into a filters array. A non-empty
+ * value places (or replaces) the search filter at the front; an empty/whitespace
+ * value removes it. Pure and non-mutating so it can be unit-tested in isolation.
+ */
+export function upsertSearchFilter(filters: Filter[], value: string): Filter[] {
+  const others = filters.filter((f) => f.id !== TABLE_SEARCH_FILTER_ID);
+  if (value.trim() === "") return others;
+  const searchFilter: Filter = {
+    id: TABLE_SEARCH_FILTER_ID,
+    column: ANY_COLUMN_VALUE,
+    operator: "LIKE",
+    value,
+    enabled: true,
+  };
+  return [searchFilter, ...others];
+}
+
 // --- Per-table state cache (filters, page, pageSize) ---
 
 interface TableState {
@@ -92,6 +116,12 @@ function writeTableState(
   const cache = loadTableCache();
   cache[tableCacheKey(connectionId, schema, table)] = {
     ...state,
+    // The table-search filter is session-only — never persist it. If restored,
+    // previewTable would re-apply it before a result exists, building its
+    // any-column clause from stale/empty columns (the clause collapses to TRUE,
+    // silently showing unfiltered data, or references the previous table's
+    // columns and errors). Column-specific filters are safe to persist.
+    filters: state.filters.filter((f) => f.id !== TABLE_SEARCH_FILTER_ID),
     lastUsed: Date.now(),
   };
   persistTableCache(cache);
@@ -171,6 +201,7 @@ interface QueryState {
   updateFilter: (filterId: string, updates: Partial<Filter>) => void;
   removeFilter: (filterId: string) => void;
   applyFilters: (opts?: { resetPage?: boolean }) => Promise<void>;
+  setTableSearch: (value: string) => void;
   setSort: (sort: SortSpec | null) => void;
   setPage: (page: number) => void;
   setPageSize: (pageSize: number) => void;
@@ -523,6 +554,26 @@ export const useQueryStore = create<QueryState>((set, get) => ({
       if (!isStillCurrent(initialConnId, schema, table)) return;
       set({ error: String(e), isExecuting: false });
     }
+  },
+
+  setTableSearch: (value) => {
+    // Searching a table changes the result set, so always land on page 0.
+    set((s) => ({
+      filters: upsertSearchFilter(s.filters, value),
+      page: 0,
+      selectedRowIndex: null,
+    }));
+    const s = get();
+    const connId = getActiveConnectionIdSync();
+    if (connId && s.tableContext) {
+      writeTableState(connId, s.tableContext.schema, s.tableContext.table, {
+        filters: s.filters,
+        pageSize: s.pageSize,
+      });
+    }
+    // applyFilters falls back to the plain preview path when no filters remain,
+    // so clearing the search restores the full table automatically.
+    get().applyFilters({ resetPage: true });
   },
 
   setSort: (sort) => {

@@ -16,6 +16,7 @@ export const en: Record<TranslationKey, string> = {
   "sidebar.resize": "Drag to resize (double-click to reset)",
   "sidebar.searchTables": "Search tables...",
   "sidebar.clearSearch": "Clear search",
+  "tableSearch.placeholder": "Search this table...",
 
   // Connection
   "connection.new": "New Connection",

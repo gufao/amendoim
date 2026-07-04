@@ -106,6 +106,10 @@ function App() {
         }
         const query = addQuery(targetConnectionId, title, sql);
         setActiveQueryId(query.id);
+        // Leave any open table preview: this is an ad-hoc query, not a table
+        // view, so clear tableContext (otherwise the sidebar keeps highlighting
+        // the old table and the filter/search bars show its stale context).
+        resetDataState();
         setSql(sql);
         executeQuery();
       }
@@ -113,7 +117,7 @@ function App() {
     return () => {
       unlisten.then((f) => f());
     };
-  }, [addQuery, setActiveQueryId, setSql, executeQuery, activeConnectionId]);
+  }, [addQuery, setActiveQueryId, setSql, executeQuery, resetDataState, activeConnectionId]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {

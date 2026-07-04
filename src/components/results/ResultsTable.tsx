@@ -14,6 +14,7 @@ import { useSchemaStore } from "../../stores/schemaStore";
 import { useT } from "../../i18n";
 import { formatCellValue, truncate } from "../../lib/format";
 import { FilterBar } from "./FilterBar";
+import { TableSearch } from "./TableSearch";
 import { ResultsToolbar } from "./ResultsToolbar";
 import { RowDetail } from "./RowDetail";
 import { InlineEdit } from "./InlineEdit";
@@ -91,6 +92,11 @@ export function ResultsTable() {
     if (selectedRowIndex === null || !result) return;
     const handler = (e: KeyboardEvent) => {
       if (editingCell) return;
+      // Don't hijack arrow/escape while typing in an input (e.g. the table
+      // search or filter boxes) — same guard the Cmd+C / Cmd+A handlers use.
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || target?.isContentEditable) return;
       if (e.key === "ArrowDown") {
         e.preventDefault();
         const next = Math.min(selectedRowIndex + 1, result.rows.length - 1);
@@ -389,6 +395,7 @@ export function ResultsTable() {
   if (result.rows.length === 0) {
     return (
       <div className="flex flex-col h-full bg-bg-primary">
+        <TableSearch />
         <FilterBar />
         {error ? (
           <div className="px-4 pt-2 overflow-auto flex-1">
@@ -410,6 +417,7 @@ export function ResultsTable() {
 
   return (
     <div className="flex flex-col h-full bg-bg-primary relative">
+      <TableSearch />
       <FilterBar />
       <ResultsToolbar />
 

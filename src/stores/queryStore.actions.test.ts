@@ -22,7 +22,7 @@ vi.mock("./connectionStore", () => {
 });
 
 import * as api from "../lib/tauri";
-import { useQueryStore, evictTableCacheForConnection, type SortSpec } from "./queryStore";
+import { useQueryStore, evictTableCacheForConnection, TABLE_SEARCH_FILTER_ID, type SortSpec } from "./queryStore";
 
 const apiMock = api as unknown as {
   executeQuery: ReturnType<typeof vi.fn>;
@@ -274,6 +274,55 @@ describe("useQueryStore — fetchPreviewPage", () => {
     await useQueryStore.getState().fetchPreviewPage();
     expect(apiMock.previewTable).not.toHaveBeenCalled();
     expect(apiMock.executeQuery).not.toHaveBeenCalled();
+  });
+});
+
+describe("useQueryStore — setTableSearch persistence", () => {
+  const KEY = "amendoim.tableStateCache.v1";
+
+  function waitForWrite() {
+    // persistTableCache debounces 250ms via setTimeout.
+    return new Promise((r) => setTimeout(r, 300));
+  }
+
+  beforeEach(() => {
+    useQueryStore.setState({
+      tableContext: { schema: "public", table: "users" },
+      result: emptyResult(),
+      filters: [],
+    });
+    apiMock.executeQuery.mockResolvedValue(emptyResult());
+    apiMock.previewTable.mockResolvedValue(emptyResult());
+  });
+
+  it("never persists the reserved table-search filter (session-only)", async () => {
+    useQueryStore.getState().setTableSearch("maria");
+    await waitForWrite();
+
+    const cache = JSON.parse(localStorage.getItem(KEY) ?? "{}");
+    const entry = cache["conn-1::public.users"];
+    expect(entry).toBeDefined();
+    const ids = (entry.filters as { id: string }[]).map((f) => f.id);
+    expect(ids).not.toContain(TABLE_SEARCH_FILTER_ID);
+  });
+
+  it("still persists regular column filters while stripping the search filter", async () => {
+    useQueryStore.setState({
+      filters: [{ id: "f1", column: "name", operator: "LIKE", value: "x", enabled: true }],
+    });
+    useQueryStore.getState().setTableSearch("maria");
+    await waitForWrite();
+
+    const cache = JSON.parse(localStorage.getItem(KEY) ?? "{}");
+    const ids = (cache["conn-1::public.users"].filters as { id: string }[]).map((f) => f.id);
+    expect(ids).toContain("f1");
+    expect(ids).not.toContain(TABLE_SEARCH_FILTER_ID);
+  });
+
+  it("keeps the search active in live state (only persistence is stripped)", () => {
+    useQueryStore.getState().setTableSearch("maria");
+    const ids = useQueryStore.getState().filters.map((f) => f.id);
+    expect(ids).toContain(TABLE_SEARCH_FILTER_ID);
   });
 });
 

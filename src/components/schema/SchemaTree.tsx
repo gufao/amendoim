@@ -45,6 +45,7 @@ export function SchemaTree({ tableFilter = "" }: Props) {
   } = useSchema();
 
   const previewTable = useQueryStore((s) => s.previewTable);
+  const tableContext = useQueryStore((s) => s.tableContext);
   const t = useT();
   const trimmedFilter = tableFilter.trim().toLowerCase();
   const isFiltering = trimmedFilter.length > 0;
@@ -140,11 +141,18 @@ export function SchemaTree({ tableFilter = "" }: Props) {
                   const tableKey = `${schema.name}.${table.name}`;
                   const isTableExpanded = expandedTables.has(tableKey);
                   const tableCols = columns[tableKey] || [];
+                  // The table whose data is currently on screen — highlight it so
+                  // it's clear which table you're looking at after clicking around.
+                  const isActiveTable =
+                    tableContext?.schema === schema.name &&
+                    tableContext?.table === table.name;
 
                   return (
                     <div key={tableKey}>
                       <div
-                        className="flex items-center gap-1.5 pl-7 pr-3 py-[5px] cursor-pointer hover:bg-bg-hover transition-colors"
+                        className={`flex items-center gap-1.5 pl-7 pr-3 py-[5px] cursor-pointer transition-colors ${
+                          isActiveTable ? "bg-accent-subtle text-accent" : "hover:bg-bg-hover"
+                        }`}
                         onClick={() => {
                           toggleTable(schema.name, table.name);
                           handleTableClick(schema.name, table.name);
@@ -153,8 +161,8 @@ export function SchemaTree({ tableFilter = "" }: Props) {
                         <span className="text-text-faint w-3.5 flex items-center justify-center">
                           {isTableExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                         </span>
-                        <Table2 size={12} className="text-table-icon shrink-0" />
-                        <span className="truncate text-text-secondary" title={table.name}>{table.name}</span>
+                        <Table2 size={12} className={`shrink-0 ${isActiveTable ? "text-accent" : "text-table-icon"}`} />
+                        <span className={`truncate ${isActiveTable ? "text-accent font-medium" : "text-text-secondary"}`} title={table.name}>{table.name}</span>
                         {table.estimated_rows !== null && table.estimated_rows > 0 && (
                           <span className="text-text-faint ml-auto text-[10px] tabular-nums">
                             ~{table.estimated_rows}

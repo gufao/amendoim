@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect } from "react";
 import { Plus, X, Search, Code2, Copy, Check } from "lucide-react";
 import { writeText as clipboardWriteText } from "@tauri-apps/plugin-clipboard-manager";
-import { useQueryStore, FILTER_OPERATORS, ANY_COLUMN_OPERATORS, ANY_COLUMN_VALUE, buildFilteredSql, defaultOperatorForType } from "../../stores/queryStore";
+import { useQueryStore, FILTER_OPERATORS, ANY_COLUMN_OPERATORS, ANY_COLUMN_VALUE, TABLE_SEARCH_FILTER_ID, buildFilteredSql, defaultOperatorForType } from "../../stores/queryStore";
 import { useFilterQuery } from "../../hooks/useQuery";
 import { useT } from "../../i18n";
 
@@ -154,7 +154,12 @@ export function FilterBar() {
   const columns = columnsRef.current;
 
   if (!tableContext || !columns.length) return null;
-  const hasFilters = filters.length > 0;
+
+  // The reserved table-search filter is rendered by <TableSearch/>, not here —
+  // hide it so it never shows up as a duplicate filter chip. It still composes
+  // into the executed SQL (and the SQL preview) via the full `filters` array.
+  const visibleFilters = filters.filter((f) => f.id !== TABLE_SEARCH_FILTER_ID);
+  const hasFilters = visibleFilters.length > 0;
 
   const handleApply = () => {
     applyFilters();
@@ -169,7 +174,7 @@ export function FilterBar() {
 
   return (
     <div className="border-b border-border bg-bg-surface px-3 py-2 shrink-0">
-      {filters.map((filter, i) => {
+      {visibleFilters.map((filter, i) => {
         const operators = getOperators(filter.column);
 
         return (
