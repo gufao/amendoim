@@ -145,6 +145,7 @@ export const ptBR = {
   "update.available": "Atualização disponível",
   "update.install": "Instalar e reiniciar",
   "update.installing": "Instalando...",
+  "update.error": "Falha ao atualizar:",
 
   // MCP
   "mcp.title": "Assistente IA (MCP)",

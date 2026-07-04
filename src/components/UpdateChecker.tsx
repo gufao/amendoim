@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
-import { Download, X, RefreshCw } from "lucide-react";
+import { Download, X, RefreshCw, AlertTriangle } from "lucide-react";
 import { useT } from "../i18n";
+import { formatUpdateError } from "../lib/updateError";
 
 export function UpdateChecker() {
   const t = useT();
@@ -11,6 +12,7 @@ export function UpdateChecker() {
     body: string;
   } | null>(null);
   const [installing, setInstalling] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState(false);
   const updateRef = useRef<Update | null>(null);
 
@@ -38,6 +40,7 @@ export function UpdateChecker() {
 
   const handleInstall = async () => {
     setInstalling(true);
+    setError(null);
     try {
       let update = updateRef.current;
       if (!update) {
@@ -47,7 +50,13 @@ export function UpdateChecker() {
         await update.downloadAndInstall();
         await relaunch();
       }
-    } catch {
+    } catch (err) {
+      // Surface the real failure instead of silently reverting the button.
+      // The updater replaces the running .app bundle, so the most common cause
+      // is the app running from a read-only/translocated location (i.e. not
+      // moved to /Applications) — the message makes that diagnosable.
+      console.error("[updater] install failed:", err);
+      setError(formatUpdateError(err));
       setInstalling(false);
     }
   };
@@ -79,6 +88,15 @@ export function UpdateChecker() {
           <p className="text-[11px] text-text-secondary mb-3 line-clamp-3">
             {updateAvailable.body}
           </p>
+        )}
+
+        {error && (
+          <div className="flex items-start gap-1.5 mb-3 px-2 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30">
+            <AlertTriangle size={12} className="text-red-400 shrink-0 mt-0.5" />
+            <p className="text-[10px] text-red-300 break-words">
+              {t("update.error")} {error}
+            </p>
+          </div>
         )}
 
         <button

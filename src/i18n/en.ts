@@ -147,6 +147,7 @@ export const en: Record<TranslationKey, string> = {
   "update.available": "Update available",
   "update.install": "Install and restart",
   "update.installing": "Installing...",
+  "update.error": "Update failed:",
 
   // MCP
   "mcp.title": "AI Assistant (MCP)",
