@@ -10,7 +10,9 @@ import { useQueryStore } from "./stores/queryStore";
 import { useQueryFileStore } from "./stores/queryFileStore";
 import { useConnectionStore } from "./stores/connectionStore";
 import { ConnectionModal } from "./components/connection/ConnectionModal";
+import { CommandPalette } from "./components/layout/CommandPalette";
 import { McpModal } from "./components/mcp/McpModal";
+import { useSchemaStore } from "./stores/schemaStore";
 import { UpdateChecker } from "./components/UpdateChecker";
 import type { ConnectionConfig } from "./lib/tauri";
 import { useT } from "./i18n";
@@ -21,6 +23,8 @@ function App() {
   const setActiveQueryId = useQueryStore((s) => s.setActiveQueryId);
   const setSql = useQueryStore((s) => s.setSql);
   const resetDataState = useQueryStore((s) => s.resetDataState);
+  const previewTable = useQueryStore((s) => s.previewTable);
+  const selectTable = useSchemaStore((s) => s.selectTable);
   const executeQuery = useQueryStore((s) => s.executeQuery);
   const result = useQueryStore((s) => s.result);
   const isExecuting = useQueryStore((s) => s.isExecuting);
@@ -40,6 +44,7 @@ function App() {
   const setConnectionError = useConnectionStore((s) => s.setError);
 
   const [showConnectionModal, setShowConnectionModal] = useState(false);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showMcpModal, setShowMcpModal] = useState(false);
   const [editingConnection, setEditingConnection] = useState<ConnectionConfig | null>(null);
 
@@ -119,6 +124,18 @@ function App() {
     };
   }, [addQuery, setActiveQueryId, setSql, executeQuery, resetDataState, activeConnectionId]);
 
+  // Opens a table in a brand-new tab, already pointed at its preview — the
+  // command-palette equivalent of clicking a table in the sidebar.
+  const handleOpenTable = useCallback(
+    (schema: string, table: string) => {
+      const query = addQuery(activeConnectionId, table, `SELECT * FROM "${schema}"."${table}"`);
+      setActiveQueryId(query.id);
+      selectTable(schema, table);
+      previewTable(schema, table);
+    },
+    [activeConnectionId, addQuery, setActiveQueryId, selectTable, previewTable]
+  );
+
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       const meta = e.metaKey || e.ctrlKey;
@@ -128,6 +145,10 @@ function App() {
         setActiveQueryId(query.id);
         setSql(query.sql);
         resetDataState();
+      }
+      if (meta && e.key === "p") {
+        e.preventDefault();
+        if (activeConnectionId) setShowCommandPalette(true);
       }
       if (meta && e.key === "w") {
         e.preventDefault();
@@ -144,7 +165,7 @@ function App() {
         }
       }
     },
-    [activeQueryId, addQuery, removeQuery, queries, setActiveQueryId, setSql, resetDataState, t]
+    [activeConnectionId, activeQueryId, addQuery, removeQuery, queries, setActiveQueryId, setSql, resetDataState, t]
   );
 
   useEffect(() => {
@@ -197,6 +218,13 @@ function App() {
         <ConnectionModal
           existing={editingConnection}
           onClose={() => setEditingConnection(null)}
+        />
+      )}
+
+      {showCommandPalette && (
+        <CommandPalette
+          onClose={() => setShowCommandPalette(false)}
+          onSelectTable={handleOpenTable}
         />
       )}
 
