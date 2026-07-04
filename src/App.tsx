@@ -128,15 +128,23 @@ function App() {
   // equivalent of clicking a table in the sidebar.
   const handleOpenTable = useCallback(
     (schema: string, table: string) => {
+      const baseSelect = `SELECT * FROM "${schema}"."${table}"`;
       // Bound the stored SQL with a LIMIT so clicking the tab later and hitting
-      // Run doesn't scan the whole table (matches previewTable's own query).
-      const pageSize = useQueryStore.getState().pageSize;
-      const sql = `SELECT * FROM "${schema}"."${table}" LIMIT ${pageSize}`;
-      // Reuse an existing tab for this exact preview instead of appending a new
-      // one every open — tabs are persisted, so repeats would pile up forever.
+      // Run doesn't scan the whole table.
+      const sql = `${baseSelect} LIMIT ${useQueryStore.getState().pageSize}`;
+      // Reuse the tab we already opened for this table instead of appending a
+      // new one every open (tabs are persisted — repeats would pile up). Match
+      // on a stable identity (our own title + the base SELECT), NOT the exact
+      // SQL: the LIMIT tracks the mutable global pageSize, so an exact-string
+      // match would spawn a duplicate tab after the page size changed.
       const existing = useQueryFileStore
         .getState()
-        .queries.find((q) => q.connectionId === activeConnectionId && q.sql === sql);
+        .queries.find(
+          (q) =>
+            q.connectionId === activeConnectionId &&
+            q.title === table &&
+            q.sql.startsWith(baseSelect)
+        );
       const query = existing ?? addQuery(activeConnectionId, table, sql);
       setActiveQueryId(query.id);
       selectTable(schema, table);
