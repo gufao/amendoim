@@ -19,6 +19,10 @@ export function CommandPalette({ onClose, onSelectTable }: Props) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  // Schemas we've already asked to load tables for, so each is requested
+  // exactly once, and a running count of loads still in flight (for isLoading).
+  const requestedTablesRef = useRef<Set<string>>(new Set());
+  const [pendingTableLoads, setPendingTableLoads] = useState(0);
 
   // The schema list may not be in the store yet (e.g. the user never opened the
   // sidebar tree this session). Make the palette self-sufficient by loading it.
@@ -28,19 +32,31 @@ export function CommandPalette({ onClose, onSelectTable }: Props) {
   }, []);
 
   // Eagerly load tables for every schema so the palette can search across all
-  // of them, even schemas the user never expanded in the sidebar.
+  // of them, even schemas the user never expanded in the sidebar. We subscribe
+  // to `tables`, so each resolving schema re-runs this effect — guard on a ref
+  // of already-requested schemas so we ask exactly once each, instead of
+  // re-firing loads for every schema still in flight (which was O(N^2)).
   useEffect(() => {
     const loadTables = useSchemaStore.getState().loadTables;
     for (const schema of schemas) {
-      if (!tables[schema.name]) loadTables(schema.name);
+      if (tables[schema.name] || requestedTablesRef.current.has(schema.name)) continue;
+      requestedTablesRef.current.add(schema.name);
+      setPendingTableLoads((n) => n + 1);
+      // loadTables swallows its own errors, so this settles (resolves) whether
+      // the fetch succeeds or fails — a failed schema decrements too, so one
+      // failed load can't pin the loading indicator on forever.
+      loadTables(schema.name).finally(() => setPendingTableLoads((n) => n - 1));
     }
   }, [schemas, tables]);
 
-  // We're still fetching while schemas load, or while any known schema hasn't
-  // had its tables fetched yet — show a spinner-y hint instead of "no tables".
+  // Loading while schemas are being fetched, while any table load is still in
+  // flight, or before the effect above has even requested a not-yet-loaded
+  // schema. Deliberately NOT derived from "tables[s] is undefined": a schema
+  // whose load *failed* stays undefined, which would pin this true forever.
   const isLoading =
     schemasLoading ||
-    (schemas.length > 0 && schemas.some((s) => tables[s.name] === undefined));
+    pendingTableLoads > 0 ||
+    schemas.some((s) => !tables[s.name] && !requestedTablesRef.current.has(s.name));
 
   useEffect(() => {
     inputRef.current?.focus();

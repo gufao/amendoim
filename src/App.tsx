@@ -124,11 +124,20 @@ function App() {
     };
   }, [addQuery, setActiveQueryId, setSql, executeQuery, resetDataState, activeConnectionId]);
 
-  // Opens a table in a brand-new tab, already pointed at its preview — the
-  // command-palette equivalent of clicking a table in the sidebar.
+  // Opens a table in a tab, already pointed at its preview — the command-palette
+  // equivalent of clicking a table in the sidebar.
   const handleOpenTable = useCallback(
     (schema: string, table: string) => {
-      const query = addQuery(activeConnectionId, table, `SELECT * FROM "${schema}"."${table}"`);
+      // Bound the stored SQL with a LIMIT so clicking the tab later and hitting
+      // Run doesn't scan the whole table (matches previewTable's own query).
+      const pageSize = useQueryStore.getState().pageSize;
+      const sql = `SELECT * FROM "${schema}"."${table}" LIMIT ${pageSize}`;
+      // Reuse an existing tab for this exact preview instead of appending a new
+      // one every open — tabs are persisted, so repeats would pile up forever.
+      const existing = useQueryFileStore
+        .getState()
+        .queries.find((q) => q.connectionId === activeConnectionId && q.sql === sql);
+      const query = existing ?? addQuery(activeConnectionId, table, sql);
       setActiveQueryId(query.id);
       selectTable(schema, table);
       previewTable(schema, table);
