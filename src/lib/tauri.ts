@@ -99,8 +99,12 @@ export const listIndexes = (schema: string, table: string) =>
   invoke<IndexInfo[]>("list_indexes", { schema, table });
 
 // Query commands
-export const executeQuery = (sql: string, limit?: number, offset?: number) =>
-  invoke<QueryResult>("execute_query", { sql, limit, offset });
+export const executeQuery = (
+  sql: string,
+  limit?: number,
+  offset?: number,
+  readOnly?: boolean
+) => invoke<QueryResult>("execute_query", { sql, limit, offset, readOnly });
 
 export const previewTable = (schema: string, table: string, limit?: number, offset?: number) =>
   invoke<QueryResult>("preview_table", { schema, table, limit, offset });

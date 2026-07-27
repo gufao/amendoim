@@ -36,6 +36,9 @@ function App() {
   const queries = useQueryFileStore((s) => s.queries);
   const loadQueries = useQueryFileStore((s) => s.loadQueries);
 
+  const pendingMcpSql = useQueryStore((s) => s.pendingApprovalSql);
+  const setPendingMcpSql = useQueryStore((s) => s.setPendingApprovalSql);
+
   const queryError = useQueryStore((s) => s.error);
   const clearQueryError = useQueryStore((s) => s.clearError);
 
@@ -52,6 +55,7 @@ function App() {
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showMcpModal, setShowMcpModal] = useState(false);
   const [editingConnection, setEditingConnection] = useState<ConnectionConfig | null>(null);
+
 
   // Split pane state
   const [splitRatio, setSplitRatio] = useState(0.4);
@@ -96,10 +100,15 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const unlisten = listen<{ sql: string; title: string; connection_id?: string | null }>(
+    const unlisten = listen<{
+      sql: string;
+      title: string;
+      connection_id?: string | null;
+      auto_run: boolean;
+    }>(
       "mcp-execute-query",
       async (event) => {
-        const { sql, title, connection_id } = event.payload;
+        const { sql, title, connection_id, auto_run } = event.payload;
         // If the AI specified a connection, switch to it before running so the
         // user actually executes against the database the AI picked.
         let targetConnectionId = activeConnectionId;
@@ -121,13 +130,24 @@ function App() {
         // the old table and the filter/search bars show its stale context).
         resetDataState();
         setSql(sql);
-        executeQuery();
+
+        // Anything that could write waits for the user. The sender is any local
+        // process that can reach the MCP port — not necessarily the AI the user
+        // is talking to — so a DELETE arriving here must never run on its own.
+        if (auto_run) {
+          // Read-only transaction: `is_auto_runnable` is a lexical pre-filter,
+          // not a security boundary. Postgres is the one that actually knows
+          // whether a statement writes.
+          executeQuery(sql, true);
+        } else {
+          setPendingMcpSql(sql);
+        }
       }
     );
     return () => {
       unlisten.then((f) => f());
     };
-  }, [addQuery, setActiveQueryId, setSql, executeQuery, resetDataState, activeConnectionId]);
+  }, [addQuery, setActiveQueryId, setSql, executeQuery, resetDataState, activeConnectionId, setPendingMcpSql]);
 
   // Bring the MCP server back if the user left it running. Declared after the
   // "mcp-execute-query" effect on purpose: effects fire in declaration order, so
@@ -261,6 +281,20 @@ function App() {
 
       {showMcpModal && <McpModal onClose={() => setShowMcpModal(false)} />}
 
+      {pendingMcpSql !== null && (
+        <McpConfirmModal
+          sql={pendingMcpSql}
+          onCancel={() => setPendingMcpSql(null)}
+          onConfirm={() => {
+            // Run exactly what the dialog showed, not whatever is in the editor
+            // now — and clear the gate first so this call is allowed through.
+            const approved = pendingMcpSql;
+            setPendingMcpSql(null);
+            executeQuery(approved);
+          }}
+        />
+      )}
+
       <UpdateChecker />
 
       {queryError && (
@@ -286,6 +320,72 @@ function App() {
           onDismiss={clearMcpRestoreError}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * Approval gate for MCP-supplied SQL that could write. The SQL is already loaded
+ * in the editor behind this — cancelling leaves it there for the user to inspect
+ * or edit rather than discarding it.
+ */
+function McpConfirmModal({
+  sql,
+  onConfirm,
+  onCancel,
+}: {
+  sql: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const t = useT();
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancel();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onCancel]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="bg-bg-elevated rounded-xl shadow-2xl border border-border w-[520px] max-h-[85vh] flex flex-col animate-fade-in">
+        <div className="flex items-start gap-3 px-5 py-4 border-b border-border">
+          <div className="w-8 h-8 shrink-0 rounded-lg bg-error/10 flex items-center justify-center">
+            <AlertCircle size={16} className="text-error" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-text-primary">
+              {t("mcp.confirmTitle")}
+            </h2>
+            <p className="text-[11px] text-text-secondary mt-0.5">
+              {t("mcp.confirmDescription")}
+            </p>
+          </div>
+        </div>
+
+        <div className="px-5 py-4 overflow-auto">
+          <pre className="text-[11px] font-mono text-text-primary whitespace-pre-wrap break-words bg-bg-primary rounded-md border border-border p-3 max-h-60 overflow-auto select-text">
+            {sql}
+          </pre>
+        </div>
+
+        <div className="flex justify-end gap-2 px-5 py-3 border-t border-border">
+          <button
+            onClick={onCancel}
+            className="px-3 py-1.5 rounded-md text-[11px] font-medium text-text-secondary hover:bg-bg-hover transition-colors"
+          >
+            {t("mcp.confirmCancel")}
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-3 py-1.5 rounded-md text-[11px] font-medium bg-error text-white hover:bg-error/90 transition-colors"
+          >
+            {t("mcp.confirmRun")}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

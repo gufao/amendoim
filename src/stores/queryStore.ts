@@ -193,7 +193,15 @@ interface QueryState {
   setActiveQueryId: (id: string | null) => void;
   setSql: (sql: string) => void;
   setSelectedRowIndex: (index: number | null) => void;
-  executeQuery: (sqlOverride?: string) => Promise<void>;
+  executeQuery: (sqlOverride?: string, readOnly?: boolean) => Promise<void>;
+  /**
+   * SQL that arrived over MCP and can write, waiting for the user to approve.
+   * While it is set, `executeQuery` refuses to run anything — the payload is
+   * already sitting in the editor, so Cmd+Enter or a Run click would otherwise
+   * execute it straight past the dialog.
+   */
+  pendingApprovalSql: string | null;
+  setPendingApprovalSql: (sql: string | null) => void;
   cancelQuery: () => Promise<void>;
   previewTable: (schema: string, table: string) => Promise<void>;
   fetchPreviewPage: () => Promise<void>;
@@ -313,8 +321,14 @@ export const useQueryStore = create<QueryState>((set, get) => ({
 
   clearError: () => set({ error: null }),
 
-  executeQuery: async (sqlOverride) => {
+  pendingApprovalSql: null,
+  setPendingApprovalSql: (sql) => set({ pendingApprovalSql: sql }),
+
+  executeQuery: async (sqlOverride, readOnly) => {
     const state = get();
+    // Approval gate: nothing runs while a write is waiting on the user. The
+    // approve path clears this first, so its own call goes through.
+    if (state.pendingApprovalSql !== null) return;
     const sql = sqlOverride?.trim() || state.sql.trim();
     if (!sql) return;
 
@@ -322,7 +336,7 @@ export const useQueryStore = create<QueryState>((set, get) => ({
     set({ isExecuting: true, error: null, selectedRowIndex: null });
 
     try {
-      const result = await api.executeQuery(sql, state.pageSize, state.page * state.pageSize);
+      const result = await api.executeQuery(sql, state.pageSize, state.page * state.pageSize, readOnly);
       // If the user switched connection while we were waiting, drop the result
       // so it doesn't overwrite the new connection's empty state.
       if (getActiveConnectionIdSync() !== initialConnId) return;
@@ -344,7 +358,7 @@ export const useQueryStore = create<QueryState>((set, get) => ({
         const stripped = sql.replace(/;+\s*$/, "").trim();
         const countSql = `SELECT count(*) AS total FROM (${stripped}) _ame_count`;
         api
-          .executeQuery(countSql, undefined, undefined)
+          .executeQuery(countSql, undefined, undefined, readOnly)
           .then((cr) => {
             const raw = cr.rows[0]?.["total"];
             const totalNum =

@@ -13,6 +13,9 @@ pub async fn execute_query(
     sql: String,
     limit: Option<i64>,
     offset: Option<i64>,
+    // Set by the MCP auto-run path. Absent (= false) for anything the user
+    // started themselves, so manual DML keeps working.
+    read_only: Option<bool>,
 ) -> Result<QueryResult, String> {
     let (pool, connection_id) = {
         let manager = state.lock().await;
@@ -20,7 +23,7 @@ pub async fn execute_query(
         let pool = manager.get_active_pool()?.clone();
         (pool, connection_id)
     };
-    executor::execute_query(&pool, &sql, limit, offset, &pids, &connection_id).await
+    executor::execute_query(&pool, &sql, limit, offset, &pids, &connection_id, read_only.unwrap_or(false)).await
 }
 
 #[tauri::command]
@@ -56,7 +59,7 @@ pub async fn preview_table(
 
     let select_sql = format!("SELECT * FROM \"{}\".\"{}\"", schema, table);
     let effective_limit = limit.or(Some(100));
-    let mut result = executor::execute_query(&pool, &select_sql, effective_limit, offset, &pids, &connection_id).await?;
+    let mut result = executor::execute_query(&pool, &select_sql, effective_limit, offset, &pids, &connection_id, false).await?;
     result.total_rows = estimate;
     result.total_rows_estimated = estimate.is_some();
 
@@ -78,7 +81,7 @@ pub async fn export_csv(
         let pool = manager.get_active_pool()?.clone();
         (pool, connection_id)
     };
-    let result = executor::execute_query(&pool, &sql, limit, offset, &pids, &connection_id).await?;
+    let result = executor::execute_query(&pool, &sql, limit, offset, &pids, &connection_id, false).await?;
 
     if result.columns.is_empty() {
         return Ok(String::new());

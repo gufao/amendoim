@@ -13,6 +13,14 @@ pub fn create_active_query_pids() -> ActiveQueryPids {
     Arc::new(Mutex::new(HashMap::new()))
 }
 
+/// `read_only`: run inside `BEGIN READ ONLY` and always roll back.
+///
+/// Used for MCP queries that run without the user approving them. A keyword
+/// blocklist cannot be the security boundary for SQL — `SELECT … INTO` creates a
+/// table, `SELECT setval(…)` wrecks a sequence, and any volatile function can
+/// write without a single blocked keyword appearing. Postgres knows what writes
+/// and we don't, so let it be the authority; `is_auto_runnable` stays only as a
+/// cheap pre-filter that decides whether to *ask* the user.
 pub async fn execute_query(
     pool: &PgPool,
     sql: &str,
@@ -20,6 +28,7 @@ pub async fn execute_query(
     offset: Option<i64>,
     active_pids: &ActiveQueryPids,
     connection_id: &str,
+    read_only: bool,
 ) -> Result<QueryResult, String> {
     let start = Instant::now();
 
@@ -39,7 +48,22 @@ pub async fn execute_query(
 
     active_pids.lock().await.insert(connection_id.to_string(), pid);
 
+    if read_only {
+        sqlx::query("BEGIN READ ONLY")
+            .execute(&mut *conn)
+            .await
+            .map_err(|e| format!("Failed to open read-only transaction: {}", e))?;
+    }
+
     let result = execute_query_inner(&mut *conn, sql, limit, offset, start).await;
+
+    if read_only {
+        // Roll back rather than commit: a read-only transaction has nothing to
+        // persist, and this way nothing survives even if something did slip
+        // past Postgres' own check. The connection goes back to the pool, so
+        // this must run whether the query succeeded or failed.
+        let _ = sqlx::query("ROLLBACK").execute(&mut *conn).await;
+    }
 
     // Always clean up PID, even on error
     active_pids.lock().await.remove(connection_id);
@@ -223,6 +247,67 @@ fn strip_leading_ws_and_comments(sql: &str) -> &str {
 /// respecting single-quoted strings (with `''` escape), double-quoted
 /// identifiers, dollar-quoting (`$$...$$` or `$tag$...$tag$`), line comments
 /// (`-- ...\n`), and block comments (`/* ... */`, nested allowed).
+/// Statements that can modify data or schema. Anything containing one of these
+/// as a whole word is never auto-run.
+const WRITING_KEYWORDS: [&str; 13] = [
+    "INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "CREATE", "TRUNCATE", "GRANT", "REVOKE",
+    "COPY", "MERGE", "CALL",
+    // `SELECT … INTO` is Postgres' spelling of CREATE TABLE AS, and it starts
+    // with SELECT, so nothing else here would catch it.
+    "INTO",
+];
+
+fn is_ident_byte(b: u8) -> bool {
+    b.is_ascii_alphanumeric() || b == b'_'
+}
+
+/// Whole-word search, so `SELECT updated_at` isn't read as an UPDATE.
+fn contains_word(haystack: &str, word: &str) -> bool {
+    let bytes = haystack.as_bytes();
+    let mut from = 0;
+    while let Some(pos) = haystack[from..].find(word) {
+        let start = from + pos;
+        let end = start + word.len();
+        let before_ok = start == 0 || !is_ident_byte(bytes[start - 1]);
+        let after_ok = end == haystack.len() || !is_ident_byte(bytes[end]);
+        if before_ok && after_ok {
+            return true;
+        }
+        from = start + 1;
+    }
+    false
+}
+
+/// Whether `sql` may run without asking the user to confirm first.
+///
+/// This gates SQL arriving over MCP, where the sender is any local process that
+/// can reach 127.0.0.1:7432 — not necessarily the user. Read-only queries run
+/// straight away (that is the point of the feature); anything that could write
+/// waits for a click.
+///
+/// Deliberately stricter than the SELECT classification used for LIMIT wrapping:
+/// that one only has to be right about the shape of the result set, this one is
+/// a safety gate. So:
+///   - every statement of a multi-statement script must pass, otherwise
+///     `SELECT 1; DROP TABLE t` would sneak through on its first statement;
+///   - a writing keyword anywhere disqualifies the statement, otherwise a
+///     data-modifying CTE (`WITH x AS (DELETE ... RETURNING *) SELECT * FROM x`)
+///     would pass just for starting with WITH.
+///
+/// A read-only query that merely mentions one of those words in a string literal
+/// is a false positive. It costs one extra click, which is the side to err on.
+pub(crate) fn is_auto_runnable(sql: &str) -> bool {
+    let statements = split_sql_statements(sql);
+    if statements.is_empty() {
+        return false;
+    }
+    statements.iter().all(|stmt| {
+        let body = strip_leading_ws_and_comments(stmt).to_ascii_uppercase();
+        (body.starts_with("SELECT") || body.starts_with("WITH"))
+            && !WRITING_KEYWORDS.iter().any(|kw| contains_word(&body, kw))
+    })
+}
+
 fn split_sql_statements(sql: &str) -> Vec<String> {
     let mut statements: Vec<String> = Vec::new();
     let mut current = String::new();
@@ -468,7 +553,7 @@ fn pg_value_to_json(row: &sqlx::postgres::PgRow, ordinal: usize, type_name: &str
 
 #[cfg(test)]
 mod tests {
-    use super::{split_sql_statements, strip_leading_ws_and_comments};
+    use super::{is_auto_runnable, split_sql_statements, strip_leading_ws_and_comments};
 
     fn classify_is_select(sql: &str) -> bool {
         let body = strip_leading_ws_and_comments(sql).to_uppercase();
@@ -611,5 +696,143 @@ mod tests {
         let r = split_sql_statements(sql);
         assert_eq!(r.len(), 2);
         assert!(r[0].contains("$1"));
+    }
+
+    #[test]
+    fn auto_runs_plain_reads() {
+        assert!(is_auto_runnable("SELECT * FROM users"));
+        assert!(is_auto_runnable("  select 1"));
+        assert!(is_auto_runnable("-- header\nSELECT 1"));
+        assert!(is_auto_runnable("/* x */ WITH t AS (SELECT 1) SELECT * FROM t"));
+        assert!(is_auto_runnable("SELECT 1; SELECT 2;"));
+    }
+
+    #[test]
+    fn never_auto_runs_writes() {
+        assert!(!is_auto_runnable("DELETE FROM users"));
+        assert!(!is_auto_runnable("UPDATE users SET name = 'x'"));
+        assert!(!is_auto_runnable("DROP TABLE users"));
+        assert!(!is_auto_runnable("INSERT INTO t VALUES (1)"));
+        assert!(!is_auto_runnable("TRUNCATE t"));
+        assert!(!is_auto_runnable("-- innocent\nDROP TABLE users"));
+    }
+
+    #[test]
+    fn a_trailing_write_does_not_ride_along_on_a_leading_select() {
+        // The LIMIT-wrapping classifier only inspects the first statement, so
+        // this is exactly the shape that must not slip through the safety gate.
+        assert!(!is_auto_runnable("SELECT 1; DROP TABLE users"));
+        assert!(!is_auto_runnable("SELECT 1; DELETE FROM users;"));
+    }
+
+    #[test]
+    fn a_writing_cte_does_not_pass_for_starting_with_with() {
+        assert!(!is_auto_runnable(
+            "WITH gone AS (DELETE FROM users RETURNING *) SELECT * FROM gone"
+        ));
+        assert!(!is_auto_runnable(
+            "WITH n AS (INSERT INTO t VALUES (1) RETURNING id) SELECT * FROM n"
+        ));
+    }
+
+    #[test]
+    fn select_into_is_never_auto_run() {
+        // `SELECT ... INTO` is CREATE TABLE AS in disguise: it starts with
+        // SELECT and contains none of the other writing keywords.
+        assert!(!is_auto_runnable("SELECT 1 AS x INTO pwned"));
+        assert!(!is_auto_runnable("SELECT * INTO pwned FROM pg_class"));
+        assert!(!is_auto_runnable("select 1 into pwned"));
+        assert!(!is_auto_runnable("SELECT * INTO UNLOGGED t FROM pg_class"));
+    }
+
+    #[test]
+    fn keyword_match_is_whole_word_only() {
+        // `updated_at` / `created_at` must not be read as UPDATE / CREATE,
+        // otherwise the most ordinary query in the app needs a confirmation.
+        assert!(is_auto_runnable("SELECT updated_at, created_at FROM users"));
+        assert!(is_auto_runnable("SELECT * FROM deleted_users"));
+        assert!(is_auto_runnable("SELECT insertion_id FROM t"));
+    }
+
+    /// Integration check for the read-only wrapper — the layer that actually
+    /// stops writes, as opposed to `is_auto_runnable`, which only decides
+    /// whether to ask. Needs a real Postgres, so it is `#[ignore]`d and CI skips
+    /// it. Run with:
+    ///   AMENDOIM_TEST_DB=postgres://user:pass@localhost:5432/db \
+    ///     cargo test --lib read_only -- --ignored --nocapture
+    #[tokio::test]
+    #[ignore]
+    async fn read_only_transaction_blocks_side_effects_a_keyword_scan_cannot_see() {
+        let url = match std::env::var("AMENDOIM_TEST_DB") {
+            Ok(u) => u,
+            Err(_) => panic!("set AMENDOIM_TEST_DB to run this test"),
+        };
+        let pool = sqlx::PgPool::connect(&url).await.expect("connect");
+        let pids = super::create_active_query_pids();
+
+        sqlx::raw_sql("DROP SEQUENCE IF EXISTS amendoim_ro_probe; CREATE SEQUENCE amendoim_ro_probe START 1;")
+            .execute(&pool)
+            .await
+            .expect("setup sequence");
+
+        // `is_auto_runnable` says yes — no writing keyword appears anywhere.
+        assert!(is_auto_runnable("SELECT setval('amendoim_ro_probe', 99)"));
+
+        // ... but Postgres must refuse it under the read-only wrapper.
+        let err = super::execute_query(
+            &pool,
+            "SELECT setval('amendoim_ro_probe', 99)",
+            None,
+            None,
+            &pids,
+            "test-conn",
+            true,
+        )
+        .await
+        .expect_err("setval must be rejected in a read-only transaction");
+        assert!(
+            err.contains("read-only transaction"),
+            "unexpected error: {err}"
+        );
+
+        let last: i64 = sqlx::query_scalar("SELECT last_value FROM amendoim_ro_probe")
+            .fetch_one(&pool)
+            .await
+            .expect("read sequence");
+        assert_eq!(last, 1, "the sequence must not have moved");
+
+        // SELECT ... INTO is rejected too, even though the caller asked to run it.
+        let err = super::execute_query(
+            &pool,
+            "SELECT 1 AS x INTO amendoim_ro_probe_tbl",
+            None,
+            None,
+            &pids,
+            "test-conn",
+            true,
+        )
+        .await
+        .expect_err("SELECT INTO must be rejected");
+        assert!(err.contains("read-only transaction"), "unexpected error: {err}");
+
+        // A plain read still works, and the connection is usable afterwards —
+        // i.e. the ROLLBACK really closed the transaction before the connection
+        // went back to the pool.
+        let ok = super::execute_query(&pool, "SELECT 1 AS n", None, None, &pids, "test-conn", true)
+            .await
+            .expect("plain read must succeed under read-only");
+        assert_eq!(ok.row_count, 1);
+
+        sqlx::raw_sql("DROP SEQUENCE IF EXISTS amendoim_ro_probe")
+            .execute(&pool)
+            .await
+            .ok();
+    }
+
+    #[test]
+    fn empty_input_is_not_auto_runnable() {
+        assert!(!is_auto_runnable(""));
+        assert!(!is_auto_runnable("   \n  "));
+        assert!(!is_auto_runnable("-- just a comment"));
     }
 }

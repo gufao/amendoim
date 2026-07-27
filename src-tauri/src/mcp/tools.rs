@@ -72,7 +72,7 @@ pub fn tool_definitions() -> Value {
         },
         {
             "name": "execute_query",
-            "description": "Send a SQL query to the Amendoim app. It will open in a new tab and execute automatically. IMPORTANT: You will NOT see the results — they are displayed only in the app for the user. Use this after understanding the table structure.",
+            "description": "Send a SQL query to the Amendoim app. It opens in a new tab. Read-only queries run immediately; anything that can write is held for the user to approve and may be declined. IMPORTANT: You will NOT see the results — they are displayed only in the app for the user. Use this after understanding the table structure.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -122,6 +122,9 @@ struct McpQueryEvent {
     sql: String,
     title: String,
     connection_id: Option<String>,
+    /// False for anything that could write. The frontend loads the SQL into a
+    /// tab either way, but only runs it on its own when this is true.
+    auto_run: bool,
 }
 
 const MAX_SQL_FILE_BYTES: u64 = 50 * 1024 * 1024;
@@ -176,6 +179,8 @@ pub fn handle_execute_query(
     // model the results are being displayed.
     crate::show_main_window(app_handle);
 
+    let auto_run = crate::db::executor::is_auto_runnable(sql);
+
     app_handle
         .emit(
             "mcp-execute-query",
@@ -183,6 +188,7 @@ pub fn handle_execute_query(
                 sql: sql.to_string(),
                 title: title.to_string(),
                 connection_id,
+                auto_run,
             },
         )
         .map_err(|e| format!("Failed to emit event: {}", e))?;
@@ -190,7 +196,11 @@ pub fn handle_execute_query(
     Ok(json!({
         "content": [{
             "type": "text",
-            "text": "Query sent to Amendoim. The results are displayed in the app for the user to see. You do not have access to the query results."
+            "text": if auto_run {
+                "Query sent to Amendoim. The results are displayed in the app for the user to see. You do not have access to the query results."
+            } else {
+                "Query sent to Amendoim. It can modify data, so it is waiting for the user to review and approve it before running — it has NOT run yet, and it may never run. You do not have access to the query results."
+            }
         }]
     }))
 }
@@ -218,6 +228,8 @@ pub fn handle_execute_query_from_path(
     // the user cannot see.
     crate::show_main_window(app_handle);
 
+    let auto_run = crate::db::executor::is_auto_runnable(&sql);
+
     app_handle
         .emit(
             "mcp-execute-query",
@@ -225,6 +237,7 @@ pub fn handle_execute_query_from_path(
                 sql,
                 title: title.to_string(),
                 connection_id,
+                auto_run,
             },
         )
         .map_err(|e| format!("Failed to emit event: {}", e))?;
@@ -232,7 +245,11 @@ pub fn handle_execute_query_from_path(
     Ok(json!({
         "content": [{
             "type": "text",
-            "text": format!("SQL from {} sent to Amendoim. Results display in the app for the user.", path)
+            "text": if auto_run {
+                format!("SQL from {} sent to Amendoim. Results display in the app for the user.", path)
+            } else {
+                format!("SQL from {} sent to Amendoim. It can modify data, so it is waiting for the user to review and approve it before running — it has NOT run yet, and it may never run.", path)
+            }
         }]
     }))
 }
