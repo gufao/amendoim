@@ -13,6 +13,7 @@ import { ConnectionModal } from "./components/connection/ConnectionModal";
 import { CommandPalette } from "./components/layout/CommandPalette";
 import { McpModal } from "./components/mcp/McpModal";
 import { useSchemaStore } from "./stores/schemaStore";
+import { useMcpStore } from "./stores/mcpStore";
 import { UpdateChecker } from "./components/UpdateChecker";
 import type { ConnectionConfig } from "./lib/tauri";
 import { useT } from "./i18n";
@@ -37,6 +38,10 @@ function App() {
 
   const queryError = useQueryStore((s) => s.error);
   const clearQueryError = useQueryStore((s) => s.clearError);
+
+  const restoreMcpServer = useMcpStore((s) => s.restoreServer);
+  const mcpRestoreError = useMcpStore((s) => s.restoreError);
+  const clearMcpRestoreError = useMcpStore((s) => s.clearRestoreError);
 
   const activeConnectionId = useConnectionStore((s) => s.activeConnectionId);
   const loadConnections = useConnectionStore((s) => s.loadConnections);
@@ -123,6 +128,15 @@ function App() {
       unlisten.then((f) => f());
     };
   }, [addQuery, setActiveQueryId, setSql, executeQuery, resetDataState, activeConnectionId]);
+
+  // Bring the MCP server back if the user left it running. Declared after the
+  // "mcp-execute-query" effect on purpose: effects fire in declaration order, so
+  // the `listen()` call is at least issued before the port opens. That is not a
+  // hard guarantee — `listen()` is an async IPC round-trip — but a client still
+  // has to connect and invoke a tool, which is orders of magnitude slower.
+  useEffect(() => {
+    restoreMcpServer();
+  }, []);
 
   // Opens a table in a tab, already pointed at its preview — the command-palette
   // equivalent of clicking a table in the sidebar.
@@ -262,6 +276,14 @@ function App() {
         <ErrorToast
           message={connectionError}
           onDismiss={() => setConnectionError(null)}
+        />
+      )}
+
+      {mcpRestoreError && (
+        <ErrorToast
+          title={t("mcp.title")}
+          message={mcpRestoreError}
+          onDismiss={clearMcpRestoreError}
         />
       )}
     </div>

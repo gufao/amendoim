@@ -168,6 +168,7 @@ export const en: Record<TranslationKey, string> = {
   "mcp.copy": "Copy",
   "mcp.copied": "Copied!",
   "mcp.install": "Install",
+  "mcp.autoStart": "Start automatically when Amendoim opens",
   "mcp.privacyTitle": "Privacy:",
   "mcp.privacyNote": "The AI only accesses metadata (table names, columns, types). Query results are displayed only in the Amendoim app — the AI never sees your data.",
   "mcp.statusBar": "AI",

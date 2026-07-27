@@ -57,10 +57,15 @@ export function McpModal({ onClose }: McpModalProps) {
   const stopServer = useMcpStore((s) => s.stopServer);
   const installClient = useMcpStore((s) => s.installClient);
   const clearMessages = useMcpStore((s) => s.clearMessages);
+  const autoStart = useMcpStore((s) => s.autoStart);
+  const setAutoStart = useMcpStore((s) => s.setAutoStart);
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   useEffect(() => {
+    // Drop anything left over from a previous visit (or from a failed
+    // launch-time restore) so the modal doesn't open showing a stale error.
+    clearMessages();
     loadStatus();
   }, []);
 
@@ -177,6 +182,21 @@ export function McpModal({ onClose }: McpModalProps) {
                 )}
               </button>
             </div>
+
+            {/* Auto-start. Also the only way out if the server keeps failing to
+                bind on launch — otherwise the modal would offer nothing but a
+                "Start" that fails again. */}
+            <label className="flex items-center gap-2 mt-3 pt-3 border-t border-border cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={autoStart}
+                onChange={(e) => setAutoStart(e.target.checked)}
+                className="accent-accent"
+              />
+              <span className="text-[11px] text-text-secondary">
+                {t("mcp.autoStart")}
+              </span>
+            </label>
           </div>
 
           {/* Messages */}

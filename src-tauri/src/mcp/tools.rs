@@ -170,6 +170,12 @@ pub fn handle_execute_query(
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
 
+    // This tool's whole safety model is "the AI never sees the rows, the human
+    // does". Closing the window only hides it, so without this the query would
+    // run against the user's database with nothing on screen while we tell the
+    // model the results are being displayed.
+    crate::show_main_window(app_handle);
+
     app_handle
         .emit(
             "mcp-execute-query",
@@ -207,6 +213,10 @@ pub fn handle_execute_query_from_path(
         .map(|s| s.to_string());
 
     let sql = read_sql_from_path(path)?;
+
+    // Same reason as in `handle_execute_query`: never run a query into a window
+    // the user cannot see.
+    crate::show_main_window(app_handle);
 
     app_handle
         .emit(

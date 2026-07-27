@@ -1,6 +1,6 @@
 [package]
 name = "amendoim"
-version = "0.1.0"
+version = "1.7.20"
 description = "A PostgreSQL database viewer for macOS"
 authors = ["Augusto Linhares"]
 edition = "2021"
